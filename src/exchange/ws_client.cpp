@@ -77,9 +77,7 @@ void ExchangeWsClient::connect() {
   // Connect and start thread
   client_.connect(con);
   if (io_thread_.joinable()) {
-    // If an old thread exists, wait for it to finish before starting a new one
-    // But this shouldn't be the case on initial connect.
-    io_thread_.detach();
+    io_thread_.join();
   }
   io_thread_ = std::thread([this]() { run_io_thread(); });
 
@@ -216,12 +214,11 @@ ExchangeWsClient::on_tls_init(ConnectionHdl /*hdl*/) {
 
 void ExchangeWsClient::run_io_thread() {
   try {
-    LOG_INFO("ExchangeWsClient: io_service thread starting for {}", uri_);
     client_.run();
   } catch (const std::exception &e) {
     LOG_ERROR("ExchangeWsClient: io_service exception: {}", e.what());
   }
-  LOG_INFO("ExchangeWsClient: io_service thread exiting for {}", uri_);
+  LOG_DEBUG("ExchangeWsClient: io_service thread exiting");
 }
 
 void ExchangeWsClient::reconnect_loop() {
@@ -257,11 +254,7 @@ void ExchangeWsClient::reconnect_loop() {
 
     // Run io_service again (previous run() returned when connection closed)
     if (io_thread_.joinable()) {
-      // The thread may still be nominally running and blocked on destructing
-      // some internal state of ASIO. Instead of joining (which might block),
-      // we'll detach it and let it clean itself up, or reuse threading
-      // patterns.
-      io_thread_.detach();
+      io_thread_.join();
     }
     io_thread_ = std::thread([this]() { run_io_thread(); });
 
