@@ -1,5 +1,6 @@
 #include "exchange/coinbase/coinbase_ws.h"
 #include "common/logger.h"
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 CoinbaseWs::CoinbaseWs(const std::string &ws_base_url,
@@ -7,7 +8,8 @@ CoinbaseWs::CoinbaseWs(const std::string &ws_base_url,
     : ws_base_url_(ws_base_url), ws_client_(ws_client), auth_(auth) {
   ws_client_.set_on_message(
       [this](const std::string &msg) { on_message(msg); });
-  ws_client_.set_on_connect([this]() { on_connected(); });
+  // on_connect is set by CoinbaseAdapter to call ws_->on_connected()
+  // Do NOT set it here — the adapter's set_on_connect would overwrite it
 }
 
 void CoinbaseWs::on_connected() {
@@ -80,10 +82,14 @@ void CoinbaseWs::on_message(const std::string &msg) {
         if (product_id.empty())
           continue;
 
+        // Coinbase sends "snapshot" for initial full book and "update" for deltas
+        std::string event_type = event.value("type", "update");
+
         OrderBookSnapshot snap;
         snap.exchange = Exchange::COINBASE;
         snap.pair = product_id;
         snap.local_timestamp = std::chrono::steady_clock::now();
+        snap.is_delta = (event_type != "snapshot");
 
         if (event.contains("updates")) {
           for (auto &update : event["updates"]) {
@@ -97,6 +103,12 @@ void CoinbaseWs::on_message(const std::string &msg) {
               snap.asks.push_back({price, qty});
           }
         }
+
+        // Sort for consistent ordering
+        std::sort(snap.bids.begin(), snap.bids.end(),
+                  [](const auto &a, const auto &b) { return a.price > b.price; });
+        std::sort(snap.asks.begin(), snap.asks.end(),
+                  [](const auto &a, const auto &b) { return a.price < b.price; });
 
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = callbacks_.find(product_id);

@@ -6,7 +6,8 @@ KrakenWs::KrakenWs(const std::string &ws_base_url, ExchangeWsClient &ws_client)
     : ws_base_url_(ws_base_url), ws_client_(ws_client) {
   ws_client_.set_on_message(
       [this](const std::string &msg) { on_message(msg); });
-  ws_client_.set_on_connect([this]() { on_connected(); });
+  // on_connect is set by KrakenAdapter to call ws_->on_connected()
+  // Do NOT set it here — the adapter's set_on_connect would overwrite it
 }
 
 void KrakenWs::on_connected() {
@@ -58,8 +59,11 @@ void KrakenWs::on_message(const std::string &msg) {
   try {
     auto j = nlohmann::json::parse(msg);
 
-    // Kraken WS v2 book update
+    // Kraken WS v2 book channel: "type" is "snapshot" or "update"
     if (j.contains("channel") && j["channel"] == "book" && j.contains("data")) {
+      std::string msg_type = j.value("type", "update");
+      bool is_snapshot = (msg_type == "snapshot");
+
       for (auto &data : j["data"]) {
         std::string symbol = data.value("symbol", "");
         if (symbol.empty())
@@ -69,12 +73,13 @@ void KrakenWs::on_message(const std::string &msg) {
         snap.exchange = Exchange::KRAKEN;
         snap.pair = symbol;
         snap.local_timestamp = std::chrono::steady_clock::now();
+        snap.is_delta = !is_snapshot;
 
         if (data.contains("bids")) {
           for (auto &bid : data["bids"]) {
             double price = bid.value("price", 0.0);
             double qty = bid.value("qty", 0.0);
-            if (price > 0)
+            if (price > 0 || snap.is_delta)
               snap.bids.push_back({price, qty});
           }
         }
@@ -82,7 +87,7 @@ void KrakenWs::on_message(const std::string &msg) {
           for (auto &ask : data["asks"]) {
             double price = ask.value("price", 0.0);
             double qty = ask.value("qty", 0.0);
-            if (price > 0)
+            if (price > 0 || snap.is_delta)
               snap.asks.push_back({price, qty});
           }
         }

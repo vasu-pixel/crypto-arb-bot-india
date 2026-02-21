@@ -250,6 +250,11 @@ void ExchangeWsClient::reconnect_loop() {
       continue;
     }
 
+    // Set User-Agent on reconnect (same as initial connect)
+    con->append_header("User-Agent",
+                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                       "Chrome/120.0.0.0 Safari/537.36");
+
     {
       std::lock_guard<std::mutex> lock(connection_mutex_);
       connection_hdl_ = con->get_handle();

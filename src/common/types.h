@@ -75,6 +75,7 @@ struct OrderBookSnapshot {
     std::vector<PriceLevel> asks;
     uint64_t sequence_id = 0;
     std::chrono::steady_clock::time_point local_timestamp;
+    bool is_delta = false; // true = incremental update, false = full snapshot
 };
 
 struct FeeInfo {

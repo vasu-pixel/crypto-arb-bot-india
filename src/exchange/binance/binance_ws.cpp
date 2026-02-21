@@ -19,15 +19,17 @@ void BinanceWs::subscribe_depth(const std::string &symbol,
   {
     std::lock_guard<std::mutex> lock(mutex_);
     callbacks_[lower_symbol] = std::move(callback);
-    pending_subs_.push_back(lower_symbol + "@depth@100ms");
+    // Use depth20@100ms for full top-20 snapshot stream (not delta stream)
+    pending_subs_.push_back(lower_symbol + "@depth20@100ms");
   }
 
   if (ws_client_.is_connected()) {
     nlohmann::json sub_msg = {{"method", "SUBSCRIBE"},
-                              {"params", {lower_symbol + "@depth@100ms"}},
+                              {"params", {lower_symbol + "@depth20@100ms"}},
                               {"id", 1}};
+    LOG_INFO("Binance: sending payload (single): {}", sub_msg.dump());
     ws_client_.send(sub_msg.dump());
-    LOG_INFO("Binance: subscribed to depth for {}", symbol);
+    LOG_INFO("Binance: subscribed to depth20 for {}", symbol);
   }
 }
 
@@ -38,6 +40,7 @@ void BinanceWs::on_connected() {
 
   nlohmann::json sub_msg = {
       {"method", "SUBSCRIBE"}, {"params", pending_subs_}, {"id", 1}};
+  LOG_INFO("Binance: sending payload (batched): {}", sub_msg.dump());
   ws_client_.send(sub_msg.dump());
   LOG_INFO("Binance: sent batched subscription for {} streams",
            pending_subs_.size());
@@ -49,69 +52,88 @@ void BinanceWs::unsubscribe_depth(const std::string &symbol) {
                  ::tolower);
 
   nlohmann::json unsub_msg = {{"method", "UNSUBSCRIBE"},
-                              {"params", {lower_symbol + "@depth@100ms"}},
+                              {"params", {lower_symbol + "@depth20@100ms"}},
                               {"id", 2}};
   ws_client_.send(unsub_msg.dump());
 
   std::lock_guard<std::mutex> lock(mutex_);
   callbacks_.erase(lower_symbol);
-  LOG_INFO("Binance: unsubscribed from depth for {}", symbol);
+  pending_subs_.erase(
+      std::remove(pending_subs_.begin(), pending_subs_.end(),
+                  lower_symbol + "@depth20@100ms"),
+      pending_subs_.end());
+  LOG_INFO("Binance: unsubscribed from depth20 for {}", symbol);
 }
 
 void BinanceWs::on_message(const std::string &msg) {
   try {
     auto j = nlohmann::json::parse(msg);
+
+    // Combined stream format: {"stream":"btcusd@depth20@100ms","data":{...}}
     if (j.contains("stream")) {
       std::string stream = j["stream"];
       if (stream.find("@depth") != std::string::npos) {
-        parse_depth_update(j.contains("data") ? j["data"] : j);
+        // Extract symbol from stream name: "btcusd@depth20@100ms" -> "btcusd"
+        std::string symbol = stream.substr(0, stream.find('@'));
+        parse_depth_snapshot(j.contains("data") ? j["data"] : j, symbol);
       }
-    } else if (j.contains("e") && j["e"] == "depthUpdate") {
-      parse_depth_update(j);
+    }
+    // Single stream format (partial book depth): {"lastUpdateId":..., "bids":..., "asks":...}
+    else if (j.contains("lastUpdateId") && j.contains("bids")) {
+      // Single-stream mode doesn't have the symbol in the message,
+      // so we use the first callback (only works with single subscriptions)
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!callbacks_.empty()) {
+        parse_depth_snapshot(j, callbacks_.begin()->first);
+      }
     }
   } catch (const std::exception &e) {
     LOG_DEBUG("Binance WS parse error: {}", e.what());
   }
 }
 
-void BinanceWs::parse_depth_update(const nlohmann::json &j) {
+void BinanceWs::parse_depth_snapshot(const nlohmann::json &j,
+                                     const std::string &symbol) {
   try {
-    std::string symbol = j.value("s", "");
-    std::string lower_symbol = symbol;
-    std::transform(lower_symbol.begin(), lower_symbol.end(),
-                   lower_symbol.begin(), ::tolower);
-
     OrderBookSnapshot snap;
     snap.exchange = Exchange::BINANCE_US;
     snap.pair = symbol;
-    snap.sequence_id = j.value("u", 0ULL);
+    snap.sequence_id = j.value("lastUpdateId", 0ULL);
     snap.local_timestamp = std::chrono::steady_clock::now();
 
-    if (j.contains("b")) {
-      for (auto &bid : j["b"]) {
+    if (j.contains("bids")) {
+      for (auto &bid : j["bids"]) {
         if (bid.size() >= 2) {
           double price = std::stod(bid[0].get<std::string>());
           double qty = std::stod(bid[1].get<std::string>());
-          snap.bids.push_back({price, qty});
+          if (qty > 0)
+            snap.bids.push_back({price, qty});
         }
       }
     }
-    if (j.contains("a")) {
-      for (auto &ask : j["a"]) {
+    if (j.contains("asks")) {
+      for (auto &ask : j["asks"]) {
         if (ask.size() >= 2) {
           double price = std::stod(ask[0].get<std::string>());
           double qty = std::stod(ask[1].get<std::string>());
-          snap.asks.push_back({price, qty});
+          if (qty > 0)
+            snap.asks.push_back({price, qty});
         }
       }
     }
 
+    // Sort: bids descending, asks ascending
+    std::sort(snap.bids.begin(), snap.bids.end(),
+              [](const auto &a, const auto &b) { return a.price > b.price; });
+    std::sort(snap.asks.begin(), snap.asks.end(),
+              [](const auto &a, const auto &b) { return a.price < b.price; });
+
     std::lock_guard<std::mutex> lock(mutex_);
-    auto it = callbacks_.find(lower_symbol);
+    auto it = callbacks_.find(symbol);
     if (it != callbacks_.end()) {
       it->second(snap);
     }
   } catch (const std::exception &e) {
-    LOG_DEBUG("Binance depth parse error: {}", e.what());
+    LOG_DEBUG("Binance depth snapshot parse error: {}", e.what());
   }
 }

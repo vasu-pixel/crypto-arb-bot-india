@@ -143,7 +143,8 @@ int main(int argc, char **argv) {
   // }
 
   // Hardcoded pairs to bypass REST API discovery and run without API keys
-  std::vector<std::string> pairs = {"BTC/USD", "ETH/USD", "SOL/USD"};
+  // Must use canonical "BASE-QUOTE" format used throughout the codebase
+  std::vector<std::string> pairs = {"BTC-USD", "ETH-USD", "SOL-USD"};
 
   // Initialize fee manager
   std::vector<IExchange *> exch_ptrs = {binance.get(), kraken.get(),
@@ -165,7 +166,11 @@ int main(int argc, char **argv) {
       auto &book = aggregator.get_or_create_book(exch, pair);
       adapter->subscribe_order_book(
           pair, [&book](const OrderBookSnapshot &snap) {
-            book.apply_snapshot(snap.bids, snap.asks, snap.sequence_id);
+            if (snap.is_delta) {
+              book.apply_delta(snap.bids, snap.asks, snap.sequence_id);
+            } else {
+              book.apply_snapshot(snap.bids, snap.asks, snap.sequence_id);
+            }
           });
     }
   }

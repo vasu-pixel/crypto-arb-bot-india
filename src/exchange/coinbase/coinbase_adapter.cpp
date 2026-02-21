@@ -23,8 +23,8 @@ CoinbaseAdapter::CoinbaseAdapter(const Config &config) {
   } catch (...) {
     cached_fees_.maker_fee = 0.004;
     cached_fees_.taker_fee = 0.006;
-    cached_fees_.taker_fee = 0.006;
   }
+  cached_fees_.exchange = Exchange::COINBASE;
 
   ws_client_->set_on_connect([this]() { ws_->on_connected(); });
 }

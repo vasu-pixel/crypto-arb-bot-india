@@ -23,7 +23,7 @@ public:
 
 private:
   void on_message(const std::string &msg);
-  void parse_depth_update(const nlohmann::json &j);
+  void parse_depth_snapshot(const nlohmann::json &j, const std::string &symbol);
 
   std::string ws_base_url_;
   ExchangeWsClient &ws_client_;
