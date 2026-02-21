@@ -16,11 +16,7 @@ KrakenAdapter::KrakenAdapter(const Config &config) {
   ws_ = std::make_unique<KrakenWs>(config_.ws_base_url, *ws_client_);
   build_pair_maps();
 
-  ws_client_->set_on_connect([this]() {
-    for (const auto &[symbol, cb] : ws_->get_callbacks()) {
-      ws_->subscribe_depth(symbol, cb);
-    }
-  });
+  ws_client_->set_on_connect([this]() { ws_->on_connected(); });
 }
 
 void KrakenAdapter::build_pair_maps() {

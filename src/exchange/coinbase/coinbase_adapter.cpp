@@ -26,11 +26,7 @@ CoinbaseAdapter::CoinbaseAdapter(const Config &config) {
     cached_fees_.taker_fee = 0.006;
   }
 
-  ws_client_->set_on_connect([this]() {
-    for (const auto &[symbol, cb] : ws_->get_callbacks()) {
-      ws_->subscribe_level2(symbol, cb);
-    }
-  });
+  ws_client_->set_on_connect([this]() { ws_->on_connected(); });
 }
 
 // Coinbase already uses "BTC-USD" format, same as canonical

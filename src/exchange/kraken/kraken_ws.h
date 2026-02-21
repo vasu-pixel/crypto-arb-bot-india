@@ -14,6 +14,7 @@ public:
 
   void subscribe_depth(const std::string &pair, OrderBookCallback callback);
   void unsubscribe_depth(const std::string &pair);
+  void on_connected();
 
   auto get_callbacks() const
       -> const std::unordered_map<std::string, OrderBookCallback> & {
@@ -22,7 +23,6 @@ public:
 
 private:
   void on_message(const std::string &msg);
-  void on_connected();
 
   std::string ws_base_url_;
   ExchangeWsClient &ws_client_;

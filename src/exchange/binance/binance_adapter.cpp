@@ -1,6 +1,6 @@
 #include "exchange/binance/binance_adapter.h"
-#include "common/crypto_utils.h"
 #include "common/logger.h"
+#include "exchange/exchange_factory.h"
 #include <algorithm>
 #include <stdexcept>
 
@@ -18,11 +18,7 @@ BinanceAdapter::BinanceAdapter(const Config &config) {
   ws_ = std::make_unique<BinanceWs>(config_.ws_base_url, *ws_client_);
   build_pair_map();
 
-  ws_client_->set_on_connect([this]() {
-    for (const auto &[symbol, cb] : ws_->get_callbacks()) {
-      ws_->subscribe_depth(symbol, cb);
-    }
-  });
+  ws_client_->set_on_connect([this]() { ws_->on_connected(); });
 }
 
 void BinanceAdapter::build_pair_map() {
@@ -120,7 +116,7 @@ std::vector<BalanceInfo> BinanceAdapter::fetch_balances() {
 void BinanceAdapter::subscribe_order_book(const std::string &pair,
                                           OrderBookCallback cb) {
   std::string native = normalize_pair(pair);
-  ws_->subscribe_depth(native, [this, pair, cb](const OrderBookSnapshot &snap) {
+  ws_->subscribe_depth(native, [pair, cb](const OrderBookSnapshot &snap) {
     OrderBookSnapshot canonical_snap = snap;
     canonical_snap.pair = pair;
     cb(canonical_snap);

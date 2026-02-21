@@ -14,6 +14,7 @@ public:
 
   void subscribe_depth(const std::string &symbol, OrderBookCallback callback);
   void unsubscribe_depth(const std::string &symbol);
+  void on_connected();
 
   auto get_callbacks() const
       -> const std::unordered_map<std::string, OrderBookCallback> & {
@@ -27,5 +28,6 @@ private:
   std::string ws_base_url_;
   ExchangeWsClient &ws_client_;
   std::unordered_map<std::string, OrderBookCallback> callbacks_;
+  std::vector<std::string> pending_subs_;
   std::mutex mutex_;
 };

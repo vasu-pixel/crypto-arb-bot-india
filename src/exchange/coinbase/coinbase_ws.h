@@ -17,6 +17,7 @@ public:
   void subscribe_level2(const std::string &product_id,
                         OrderBookCallback callback);
   void unsubscribe_level2(const std::string &product_id);
+  void on_connected();
 
   auto get_callbacks() const
       -> const std::unordered_map<std::string, OrderBookCallback> & {
@@ -25,7 +26,6 @@ public:
 
 private:
   void on_message(const std::string &msg);
-  void on_connected();
 
   std::string ws_base_url_;
   ExchangeWsClient &ws_client_;
