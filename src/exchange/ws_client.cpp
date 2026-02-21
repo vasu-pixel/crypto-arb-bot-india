@@ -216,11 +216,12 @@ ExchangeWsClient::on_tls_init(ConnectionHdl /*hdl*/) {
 
 void ExchangeWsClient::run_io_thread() {
   try {
+    LOG_INFO("ExchangeWsClient: io_service thread starting for {}", uri_);
     client_.run();
   } catch (const std::exception &e) {
     LOG_ERROR("ExchangeWsClient: io_service exception: {}", e.what());
   }
-  LOG_DEBUG("ExchangeWsClient: io_service thread exiting");
+  LOG_INFO("ExchangeWsClient: io_service thread exiting for {}", uri_);
 }
 
 void ExchangeWsClient::reconnect_loop() {
