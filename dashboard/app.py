@@ -1,5 +1,6 @@
 import os
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
     page_title="Crypto Arb Bot",
@@ -7,6 +8,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Auto-refresh every 2 seconds so connection status and metrics stay current
+st_autorefresh(interval=2000, key="home_refresh")
 
 from ws_receiver import WsReceiver
 
