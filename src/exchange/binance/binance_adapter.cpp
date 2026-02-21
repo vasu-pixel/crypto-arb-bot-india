@@ -128,6 +128,27 @@ void BinanceAdapter::unsubscribe_order_book(const std::string &pair) {
 }
 
 void BinanceAdapter::connect() {
+  // Build combined stream URL: /stream?streams=btcusd@depth20@100ms/ethusd@depth20@100ms/...
+  // This is more reliable than subscribing via JSON on /ws endpoint
+  auto streams = ws_->get_pending_streams();
+  if (!streams.empty()) {
+    std::string stream_path = "/stream?streams=";
+    for (size_t i = 0; i < streams.size(); ++i) {
+      if (i > 0) stream_path += "/";
+      stream_path += streams[i];
+    }
+    // Replace /ws at end of base URL with /stream?streams=...
+    std::string base = config_.ws_base_url;
+    // Strip trailing path like /ws if present
+    auto pos = base.find("/ws");
+    if (pos != std::string::npos) {
+      base = base.substr(0, pos);
+    }
+    std::string combined_url = base + stream_path;
+    LOG_INFO("Binance: connecting with combined stream URL: {}", combined_url);
+    ws_client_->set_uri(combined_url);
+  }
+
   ws_client_->connect();
   LOG_INFO("Binance.US adapter connected");
 }

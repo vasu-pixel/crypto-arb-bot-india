@@ -16,33 +16,20 @@ void BinanceWs::subscribe_depth(const std::string &symbol,
   std::transform(lower_symbol.begin(), lower_symbol.end(), lower_symbol.begin(),
                  ::tolower);
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    callbacks_[lower_symbol] = std::move(callback);
-    // Use depth20@100ms for full top-20 snapshot stream (not delta stream)
-    pending_subs_.push_back(lower_symbol + "@depth20@100ms");
-  }
-
-  if (ws_client_.is_connected()) {
-    nlohmann::json sub_msg = {{"method", "SUBSCRIBE"},
-                              {"params", {lower_symbol + "@depth20@100ms"}},
-                              {"id", 1}};
-    LOG_INFO("Binance: sending payload (single): {}", sub_msg.dump());
-    ws_client_.send(sub_msg.dump());
-    LOG_INFO("Binance: subscribed to depth20 for {}", symbol);
-  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  callbacks_[lower_symbol] = std::move(callback);
+  // Use depth20@100ms for full top-20 snapshot stream (not delta stream)
+  // Streams are specified in the URL via /stream?streams=... at connect time
+  pending_subs_.push_back(lower_symbol + "@depth20@100ms");
+  LOG_INFO("Binance: registered depth20 stream for {} (will connect via URL)",
+           symbol);
 }
 
 void BinanceWs::on_connected() {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (pending_subs_.empty())
-    return;
-
-  nlohmann::json sub_msg = {
-      {"method", "SUBSCRIBE"}, {"params", pending_subs_}, {"id", 1}};
-  LOG_INFO("Binance: sending payload (batched): {}", sub_msg.dump());
-  ws_client_.send(sub_msg.dump());
-  LOG_INFO("Binance: sent batched subscription for {} streams",
+  // When using the combined stream URL (/stream?streams=...), no SUBSCRIBE
+  // message is needed — just log that we're connected and ready.
+  LOG_INFO("Binance: WebSocket connected, {} streams registered",
            pending_subs_.size());
 }
 

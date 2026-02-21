@@ -34,6 +34,7 @@ public:
     void disconnect();
     void send(const std::string& message);
     bool is_connected() const;
+    void set_uri(const std::string& uri);
 
     // ── Configuration ───────────────────────────────────────────────────
     void set_auto_reconnect(bool enabled);

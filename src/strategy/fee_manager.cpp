@@ -60,6 +60,36 @@ void FeeManager::refresh_all_fees()
     LOG_INFO("Fee refresh complete. Cached {} fee entries.", fee_cache_.size());
 }
 
+// Internal helper: returns default fees per exchange (no lock required)
+static FeeInfo default_fee_for_exchange(Exchange exch, const std::string& pair)
+{
+    FeeInfo info;
+    info.exchange = exch;
+    info.pair = pair;
+
+    // Conservative default fees per exchange when API fees are unavailable
+    // (e.g., no API key configured). These are standard retail taker/maker rates.
+    switch (exch) {
+        case Exchange::BINANCE_US:
+            info.maker_fee = 0.001;   // 0.10%
+            info.taker_fee = 0.001;   // 0.10%
+            break;
+        case Exchange::KRAKEN:
+            info.maker_fee = 0.0016;  // 0.16%
+            info.taker_fee = 0.0026;  // 0.26%
+            break;
+        case Exchange::COINBASE:
+            info.maker_fee = 0.004;   // 0.40%
+            info.taker_fee = 0.006;   // 0.60%
+            break;
+        default:
+            info.maker_fee = 0.002;   // 0.20% conservative default
+            info.taker_fee = 0.004;   // 0.40% conservative default
+            break;
+    }
+    return info;
+}
+
 FeeInfo FeeManager::get_fee(Exchange exch, const std::string& pair) const
 {
     std::shared_lock lock(mutex_);
@@ -68,13 +98,9 @@ FeeInfo FeeManager::get_fee(Exchange exch, const std::string& pair) const
         return it->second;
     }
 
-    // Return a default with zeros if not found
-    FeeInfo default_info;
-    default_info.exchange = exch;
-    default_info.pair = pair;
-    default_info.maker_fee = 0.0;
-    default_info.taker_fee = 0.0;
-    LOG_WARN("No cached fee for {}:{}, returning zero", exchange_to_string(exch), pair);
+    auto default_info = default_fee_for_exchange(exch, pair);
+    LOG_WARN("No cached fee for {}:{}, using default taker={:.4f}",
+             exchange_to_string(exch), pair, default_info.taker_fee);
     return default_info;
 }
 
@@ -89,14 +115,14 @@ double FeeManager::total_fee_rate(Exchange buy_exch, Exchange sell_exch, const s
     if (buy_it != fee_cache_.end()) {
         buy_fee = buy_it->second.taker_fee;
     } else {
-        LOG_WARN("No cached fee for buy exchange {}:{}", exchange_to_string(buy_exch), pair);
+        buy_fee = default_fee_for_exchange(buy_exch, pair).taker_fee;
     }
 
     auto sell_it = fee_cache_.find(make_key(sell_exch, pair));
     if (sell_it != fee_cache_.end()) {
         sell_fee = sell_it->second.taker_fee;
     } else {
-        LOG_WARN("No cached fee for sell exchange {}:{}", exchange_to_string(sell_exch), pair);
+        sell_fee = default_fee_for_exchange(sell_exch, pair).taker_fee;
     }
 
     return buy_fee + sell_fee;

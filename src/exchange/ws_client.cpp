@@ -136,6 +136,11 @@ void ExchangeWsClient::send(const std::string &message) {
 
 bool ExchangeWsClient::is_connected() const { return connected_.load(); }
 
+void ExchangeWsClient::set_uri(const std::string &uri) {
+  uri_ = uri;
+  LOG_DEBUG("ExchangeWsClient: URI updated to {}", uri_);
+}
+
 // ─── Internal handlers ──────────────────────────────────────────────────────
 
 void ExchangeWsClient::on_open(ConnectionHdl hdl) {
@@ -150,7 +155,17 @@ void ExchangeWsClient::on_open(ConnectionHdl hdl) {
 
 void ExchangeWsClient::on_close(ConnectionHdl hdl) {
   connected_.store(false);
-  LOG_INFO("ExchangeWsClient: connection closed for {}", uri_);
+
+  // Extract close code and reason for diagnostics
+  try {
+    auto con = client_.get_con_from_hdl(hdl);
+    auto code = con->get_remote_close_code();
+    auto reason = con->get_remote_close_reason();
+    LOG_WARN("ExchangeWsClient: connection closed for {} (code={}, reason={})",
+             uri_, code, reason.empty() ? "<none>" : reason);
+  } catch (...) {
+    LOG_INFO("ExchangeWsClient: connection closed for {}", uri_);
+  }
 
   if (on_disconnect_cb_) {
     on_disconnect_cb_();

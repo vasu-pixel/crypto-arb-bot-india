@@ -21,6 +21,12 @@ public:
     return callbacks_;
   }
 
+  // Get pending stream names for building the combined URL
+  std::vector<std::string> get_pending_streams() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return pending_subs_;
+  }
+
 private:
   void on_message(const std::string &msg);
   void parse_depth_snapshot(const nlohmann::json &j, const std::string &symbol);
@@ -29,5 +35,5 @@ private:
   ExchangeWsClient &ws_client_;
   std::unordered_map<std::string, OrderBookCallback> callbacks_;
   std::vector<std::string> pending_subs_;
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
 };
