@@ -15,6 +15,7 @@ BinanceAdapter::BinanceAdapter(const Config &config) {
   auth_ = std::make_unique<BinanceAuth>(config_.api_key, config_.secret_key);
   rest_ = std::make_unique<BinanceRest>(*rest_client_, *auth_);
   ws_client_ = std::make_unique<ExchangeWsClient>(config_.ws_base_url);
+  ws_ = std::make_unique<BinanceWs>(config_.ws_base_url, *ws_client_);
   build_pair_map();
 
   ws_client_->set_on_connect([this]() {
