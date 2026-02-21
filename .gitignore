@@ -1,0 +1,52 @@
+# Build
+build/
+cmake-build-*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env.local
+
+# Logs
+logs/
+*.log
+
+# Trade data
+data/trades/*.jsonl
+data/historical/*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.streamlit/
+dashboard/.streamlit/
+
+# Docker
+docker-compose.override.yml
+
+# Compiled
+*.o
+*.a
+*.so
+*.dylib
+arb_bot
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Makefile
+.cache/

@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  arb-bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: arb-bot
+    restart: unless-stopped
+    ports:
+      - "9002:9002"
+    volumes:
+      - ../data:/app/data
+      - ../config:/app/config:ro
+      - ../logs:/app/logs
+    env_file:
+      - ../.env
+    networks:
+      - arb-net
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: arb-dashboard
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - ARB_BOT_WS_URL=ws://arb-bot:9002
+      - ARB_BOT_MODE=${ARB_BOT_MODE:-PAPER}
+      - BACKTEST_RESULTS=/app/data/backtest_results.json
+    volumes:
+      - ../data:/app/data:ro
+    depends_on:
+      - arb-bot
+    networks:
+      - arb-net
+
+networks:
+  arb-net:
+    driver: bridge

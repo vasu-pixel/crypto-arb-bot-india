@@ -1,0 +1,36 @@
+# Stage 1: Build
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential cmake git \
+    libcurl4-openssl-dev libssl-dev \
+    libboost-all-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY CMakeLists.txt .
+COPY cmake/ cmake/
+COPY src/ src/
+
+RUN mkdir -p build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF && \
+    cmake --build . -j$(nproc)
+
+# Stage 2: Runtime
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libcurl4 libssl3 libboost-system1.74.0 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /build/build/arb_bot .
+COPY config/ config/
+
+RUN mkdir -p data logs data/historical
+
+EXPOSE 9002
+
+CMD ["./arb_bot", "--config", "config/config.json"]
