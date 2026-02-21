@@ -70,9 +70,15 @@ void ExchangeWsClient::connect() {
     connection_hdl_ = con->get_handle();
   }
 
-  client_.connect(con);
+  // Clear previous run state
+  client_.get_alog().write(websocketpp::log::alevel::app,
+                           "Connecting to " + uri_);
 
-  // Run the ASIO io_service in a dedicated thread
+  // Connect and start thread
+  client_.connect(con);
+  if (io_thread_.joinable()) {
+    io_thread_.join();
+  }
   io_thread_ = std::thread([this]() { run_io_thread(); });
 
   LOG_INFO("ExchangeWsClient: connecting to {}", uri_);
