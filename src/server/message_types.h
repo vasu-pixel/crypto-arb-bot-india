@@ -30,7 +30,8 @@ nlohmann::json make_spreads_message(
 nlohmann::json make_pnl_message(double total_pnl,
                                  const std::map<std::string, double>& pnl_per_pair,
                                  int total_trades, double win_rate,
-                                 double total_fees);
+                                 double total_fees,
+                                 const std::map<std::string, double>& fees_per_exchange);
 
 /// Envelope for the latest balances across all exchanges.
 nlohmann::json make_balances_message(

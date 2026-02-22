@@ -94,7 +94,8 @@ nlohmann::json make_balances_message(
 nlohmann::json make_pnl_message(double total_pnl,
                                  const std::map<std::string, double>& pnl_per_pair,
                                  int total_trades, double win_rate,
-                                 double total_fees)
+                                 double total_fees,
+                                 const std::map<std::string, double>& fees_per_exchange)
 {
     nlohmann::json data;
     data["total_pnl"]    = total_pnl;
@@ -107,6 +108,12 @@ nlohmann::json make_pnl_message(double total_pnl,
         per_pair[pair] = pnl;
     }
     data["pnl_per_pair"] = per_pair;
+
+    nlohmann::json fees_obj = nlohmann::json::object();
+    for (const auto& [exch, fee] : fees_per_exchange) {
+        fees_obj[exch] = fee;
+    }
+    data["fees_per_exchange"] = fees_obj;
 
     return make_envelope("pnl", data);
 }

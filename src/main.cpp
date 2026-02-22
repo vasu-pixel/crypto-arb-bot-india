@@ -306,13 +306,16 @@ int main(int argc, char **argv) {
       int total_trades = static_cast<int>(all_trades.size());
       int winning_trades = 0;
       double total_fees = 0.0;
+      std::map<std::string, double> fees_per_exchange;
       for (auto &t : all_trades) {
         if (t.realized_pnl > 0) winning_trades++;
         total_fees += t.buy_result.fee_paid + t.sell_result.fee_paid;
+        fees_per_exchange[exchange_to_string(t.buy_exchange)] += t.buy_result.fee_paid;
+        fees_per_exchange[exchange_to_string(t.sell_exchange)] += t.sell_result.fee_paid;
       }
       double win_rate = (total_trades > 0) ? (100.0 * winning_trades / total_trades) : 0.0;
 
-      ws_server.broadcast_pnl(total_pnl, pnl_per_pair, total_trades, win_rate, total_fees);
+      ws_server.broadcast_pnl(total_pnl, pnl_per_pair, total_trades, win_rate, total_fees, fees_per_exchange);
 
       // Check drift alerts
       if (config.mode == TradingMode::LIVE) {
