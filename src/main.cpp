@@ -244,25 +244,23 @@ int main(int argc, char **argv) {
 
   LOG_INFO("Bot is running. Press Ctrl+C to stop.");
 
-  // Main loop: broadcast periodic updates
+  // Main loop: fast-path (100ms) for prices/spreads, slow-path (2s) for PnL/balances
+  // Cached trade stats to avoid re-reading file every tick
+  int cached_total_trades = 0;
+  int cached_winning_trades = 0;
+  double cached_total_fees = 0.0;
+  std::map<std::string, double> cached_fees_per_exchange;
+  auto last_slow_tick = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+
   while (!g_shutdown) {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     try {
-      // Broadcast heartbeat
-      ws_server.broadcast_heartbeat();
-
-      // Broadcast balances
-      if (config.mode == TradingMode::PAPER && paper_executor) {
-        auto vb = paper_executor->get_virtual_balances();
-        std::map<Exchange, std::unordered_map<std::string, double>> balances_map;
-        for (auto &[exch, assets] : vb)
-          balances_map[exch] = assets;
-        ws_server.broadcast_balances(balances_map);
-      }
-
-      // Broadcast spreads and prices: top-of-book for every exchange pair
       auto now = std::chrono::steady_clock::now();
+      bool slow_tick = (std::chrono::duration_cast<std::chrono::seconds>(
+                            now - last_slow_tick).count() >= 2);
+
+      // ── Fast path (every 100ms): prices + spreads ──
       std::map<std::string, std::vector<MessageTypes::ExchangePrice>> all_prices;
 
       for (auto &pair : pairs) {
@@ -308,45 +306,63 @@ int main(int argc, char **argv) {
         }
       }
 
-      // Broadcast live prices
       if (!all_prices.empty()) {
         ws_server.broadcast_prices(all_prices);
       }
 
-      // Broadcast P&L with trade stats
-      double total_pnl = (config.mode == TradingMode::PAPER && paper_executor)
-                             ? paper_executor->get_virtual_pnl()
-                             : trade_logger.total_realized_pnl();
-      std::map<std::string, double> pnl_per_pair;
-      for (auto &pair : pairs) {
-        pnl_per_pair[pair] = trade_logger.pnl_for_pair(pair);
-      }
+      // ── Slow path (every 2s): heartbeat, balances, PnL, alerts ──
+      if (slow_tick) {
+        last_slow_tick = now;
 
-      // Compute trade stats from trade logger
-      auto all_trades = trade_logger.load_all_trades();
-      int total_trades = static_cast<int>(all_trades.size());
-      int winning_trades = 0;
-      double total_fees = 0.0;
-      std::map<std::string, double> fees_per_exchange;
-      for (auto &t : all_trades) {
-        if (t.realized_pnl > 0) winning_trades++;
-        total_fees += t.buy_result.fee_paid + t.sell_result.fee_paid;
-        fees_per_exchange[exchange_to_string(t.buy_exchange)] += t.buy_result.fee_paid;
-        fees_per_exchange[exchange_to_string(t.sell_exchange)] += t.sell_result.fee_paid;
-      }
-      double win_rate = (total_trades > 0) ? (100.0 * winning_trades / total_trades) : 0.0;
+        ws_server.broadcast_heartbeat();
 
-      ws_server.broadcast_pnl(total_pnl, pnl_per_pair, total_trades, win_rate, total_fees, fees_per_exchange);
+        // Broadcast balances
+        if (config.mode == TradingMode::PAPER && paper_executor) {
+          auto vb = paper_executor->get_virtual_balances();
+          std::map<Exchange, std::unordered_map<std::string, double>> balances_map;
+          for (auto &[exch, assets] : vb)
+            balances_map[exch] = assets;
+          ws_server.broadcast_balances(balances_map);
+        }
 
-      // Check drift alerts
-      if (config.mode == TradingMode::LIVE) {
-        auto alerts = inventory_tracker.check_drift();
-        for (auto &alert : alerts) {
-          nlohmann::json alert_j;
-          to_json(alert_j, alert);
-          auto envelope = MessageTypes::make_envelope("alert", alert_j);
-          ws_server.broadcast(envelope.dump());
-          LOG_WARN("Drift: {}", alert.message);
+        // Broadcast P&L with cached trade stats
+        double total_pnl = (config.mode == TradingMode::PAPER && paper_executor)
+                               ? paper_executor->get_virtual_pnl()
+                               : trade_logger.total_realized_pnl();
+        std::map<std::string, double> pnl_per_pair;
+        for (auto &pair : pairs) {
+          pnl_per_pair[pair] = trade_logger.pnl_for_pair(pair);
+        }
+
+        // Refresh trade stats from disk (every 2s instead of every 100ms)
+        auto all_trades = trade_logger.load_all_trades();
+        cached_total_trades = static_cast<int>(all_trades.size());
+        cached_winning_trades = 0;
+        cached_total_fees = 0.0;
+        cached_fees_per_exchange.clear();
+        for (auto &t : all_trades) {
+          if (t.realized_pnl > 0) cached_winning_trades++;
+          cached_total_fees += t.buy_result.fee_paid + t.sell_result.fee_paid;
+          cached_fees_per_exchange[exchange_to_string(t.buy_exchange)] += t.buy_result.fee_paid;
+          cached_fees_per_exchange[exchange_to_string(t.sell_exchange)] += t.sell_result.fee_paid;
+        }
+
+        double win_rate = (cached_total_trades > 0)
+            ? (100.0 * cached_winning_trades / cached_total_trades) : 0.0;
+
+        ws_server.broadcast_pnl(total_pnl, pnl_per_pair, cached_total_trades,
+                                 win_rate, cached_total_fees, cached_fees_per_exchange);
+
+        // Check drift alerts
+        if (config.mode == TradingMode::LIVE) {
+          auto alerts = inventory_tracker.check_drift();
+          for (auto &alert : alerts) {
+            nlohmann::json alert_j;
+            to_json(alert_j, alert);
+            auto envelope = MessageTypes::make_envelope("alert", alert_j);
+            ws_server.broadcast(envelope.dump());
+            LOG_WARN("Drift: {}", alert.message);
+          }
         }
       }
     } catch (const std::exception &e) {
