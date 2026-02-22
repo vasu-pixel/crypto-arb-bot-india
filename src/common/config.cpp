@@ -8,7 +8,9 @@ static std::string resolve_env(const std::string& value) {
     if (value.substr(0, 4) == "ENV:") {
         const char* env_val = std::getenv(value.substr(4).c_str());
         if (!env_val) {
-            throw std::runtime_error("Environment variable not set: " + value.substr(4));
+            // Return empty — API keys are optional for paper/backtest modes.
+            // Fee fetching and authenticated REST calls will gracefully fail.
+            return "";
         }
         return std::string(env_val);
     }
