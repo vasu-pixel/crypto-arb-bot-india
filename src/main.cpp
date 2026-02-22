@@ -260,6 +260,37 @@ int main(int argc, char **argv) {
       ws_server.broadcast_balances(balances_map);
     }
 
+    // Broadcast spreads: top-of-book gross/net bps for every exchange pair
+    for (auto &pair : pairs) {
+      auto snapshots = aggregator.get_pair_snapshots(pair, 5);
+      if (snapshots.size() < 2) continue;
+
+      std::map<std::string, std::map<std::string, std::pair<double, double>>> spread_matrix;
+      for (size_t i = 0; i < snapshots.size(); ++i) {
+        for (size_t j = 0; j < snapshots.size(); ++j) {
+          if (i == j) continue;
+          const auto &buy_book = snapshots[i];
+          const auto &sell_book = snapshots[j];
+          if (buy_book.asks.empty() || sell_book.bids.empty()) continue;
+
+          double top_ask = buy_book.asks.front().price;
+          double top_bid = sell_book.bids.front().price;
+          if (top_ask <= 0.0) continue;
+
+          double gross_bps = (top_bid - top_ask) / top_ask * 10000.0;
+          double fee_rate = fee_manager.total_fee_rate(
+              buy_book.exchange, sell_book.exchange, pair);
+          double net_bps = gross_bps - fee_rate * 10000.0;
+
+          spread_matrix[exchange_to_string(buy_book.exchange)]
+                       [exchange_to_string(sell_book.exchange)] = {gross_bps, net_bps};
+        }
+      }
+      if (!spread_matrix.empty()) {
+        ws_server.broadcast_spreads(spread_matrix);
+      }
+    }
+
     // Broadcast P&L
     double total_pnl = (config.mode == TradingMode::PAPER && paper_executor)
                            ? paper_executor->get_virtual_pnl()
