@@ -139,4 +139,27 @@ nlohmann::json make_alert_message(const DriftAlert& alert) {
     return make_envelope("alert", data);
 }
 
+// ── prices ────────────────────────────────────────────────────────────────
+
+nlohmann::json make_prices_message(
+    const std::map<std::string, std::vector<ExchangePrice>>& prices)
+{
+    nlohmann::json data = nlohmann::json::object();
+
+    for (const auto& [pair, exchange_prices] : prices) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& ep : exchange_prices) {
+            arr.push_back({
+                {"exchange", ep.exchange},
+                {"bid",      ep.bid},
+                {"ask",      ep.ask},
+                {"age_ms",   ep.age_ms}
+            });
+        }
+        data[pair] = arr;
+    }
+
+    return make_envelope("prices", data);
+}
+
 }  // namespace MessageTypes

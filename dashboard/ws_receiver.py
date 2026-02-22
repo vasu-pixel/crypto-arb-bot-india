@@ -28,6 +28,7 @@ class WsReceiver(threading.Thread):
         self.spreads = {}
         self.balances = {}
         self.pnl = {}
+        self.prices = {}
         self.alerts = deque(maxlen=100)
         self.connection_info = {"dropped_count": 0, "seq": 0}
         self._lock = threading.Lock()
@@ -77,6 +78,8 @@ class WsReceiver(threading.Thread):
                     self.balances = data
                 elif msg_type == "pnl":
                     self.pnl = data
+                elif msg_type == "prices":
+                    self.prices = data
                 elif msg_type == "heartbeat":
                     self.last_heartbeat = time.time()
                     self.connection_info["seq"] = data.get("seq", 0)
@@ -114,6 +117,10 @@ class WsReceiver(threading.Thread):
     def get_pnl(self):
         with self._lock:
             return dict(self.pnl)
+
+    def get_prices(self):
+        with self._lock:
+            return dict(self.prices)
 
     def get_alerts(self, n=20):
         with self._lock:

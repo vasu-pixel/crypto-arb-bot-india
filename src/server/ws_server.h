@@ -38,6 +38,8 @@ public:
                         int total_trades, double win_rate, double total_fees,
                         const std::map<std::string, double>& fees_per_exchange);
     void broadcast_heartbeat();
+    void broadcast_prices(
+        const std::map<std::string, std::vector<MessageTypes::ExchangePrice>>& prices);
 
 private:
     void run();

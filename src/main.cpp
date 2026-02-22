@@ -261,9 +261,25 @@ int main(int argc, char **argv) {
         ws_server.broadcast_balances(balances_map);
       }
 
-      // Broadcast spreads: top-of-book gross/net bps for every exchange pair
+      // Broadcast spreads and prices: top-of-book for every exchange pair
+      auto now = std::chrono::steady_clock::now();
+      std::map<std::string, std::vector<MessageTypes::ExchangePrice>> all_prices;
+
       for (auto &pair : pairs) {
         auto snapshots = aggregator.get_pair_snapshots(pair, 5);
+
+        // Collect live prices from all snapshots
+        for (const auto &snap : snapshots) {
+          MessageTypes::ExchangePrice ep;
+          ep.exchange = exchange_to_string(snap.exchange);
+          ep.bid = snap.bids.empty() ? 0.0 : snap.bids.front().price;
+          ep.ask = snap.asks.empty() ? 0.0 : snap.asks.front().price;
+          auto age = std::chrono::duration_cast<std::chrono::milliseconds>(
+              now - snap.local_timestamp);
+          ep.age_ms = age.count();
+          all_prices[pair].push_back(ep);
+        }
+
         if (snapshots.size() < 2) continue;
 
         std::map<std::string, std::map<std::string, std::pair<double, double>>> spread_matrix;
@@ -290,6 +306,11 @@ int main(int argc, char **argv) {
         if (!spread_matrix.empty()) {
           ws_server.broadcast_spreads(pair, spread_matrix);
         }
+      }
+
+      // Broadcast live prices
+      if (!all_prices.empty()) {
+        ws_server.broadcast_prices(all_prices);
       }
 
       // Broadcast P&L with trade stats

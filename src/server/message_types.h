@@ -44,4 +44,17 @@ nlohmann::json make_heartbeat_message(uint64_t seq, size_t dropped_count);
 /// Envelope for a balance-drift alert.
 nlohmann::json make_alert_message(const DriftAlert& alert);
 
+/// Per-exchange price info for a single pair.
+struct ExchangePrice {
+    std::string exchange;
+    double bid = 0.0;
+    double ask = 0.0;
+    int64_t age_ms = 0;   // milliseconds since last order book update
+};
+
+/// Envelope for live prices across all pairs and exchanges.
+/// data[pair] = [ {exchange, bid, ask, age_ms}, ... ]
+nlohmann::json make_prices_message(
+    const std::map<std::string, std::vector<ExchangePrice>>& prices);
+
 }  // namespace MessageTypes

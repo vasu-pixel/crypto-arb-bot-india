@@ -79,9 +79,38 @@ with col4:
     exchange_count = len(balances)
     st.metric("Exchanges", exchange_count)
 
+import pandas as pd
+
+# Live Prices
+prices = receiver.get_prices()
+if prices:
+    st.subheader("Live Prices")
+    price_rows = []
+    for pair, exchange_prices in sorted(prices.items()):
+        for ep in exchange_prices:
+            age_ms = ep.get("age_ms", 0)
+            if age_ms < 1000:
+                latency_str = f"{age_ms}ms"
+            else:
+                latency_str = f"{age_ms / 1000:.1f}s"
+            bid = ep.get("bid", 0)
+            ask = ep.get("ask", 0)
+            spread_pct = ((ask - bid) / bid * 100) if bid > 0 else 0
+            price_rows.append({
+                "Pair": pair,
+                "Exchange": ep.get("exchange", "").replace("_", " "),
+                "Bid": f"${bid:,.2f}" if bid >= 1 else f"${bid:.6f}",
+                "Ask": f"${ask:,.2f}" if ask >= 1 else f"${ask:.6f}",
+                "Spread": f"{spread_pct:.4f}%",
+                "Latency": latency_str,
+            })
+    if price_rows:
+        st.dataframe(
+            pd.DataFrame(price_rows), use_container_width=True, hide_index=True
+        )
+
 if trades:
     st.subheader("Latest Trades")
-    import pandas as pd
 
     df = pd.DataFrame(trades[:5])
     if not df.empty:

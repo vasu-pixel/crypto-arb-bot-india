@@ -141,3 +141,9 @@ void DashboardWsServer::broadcast_heartbeat() {
     auto msg = MessageTypes::make_heartbeat_message(heartbeat_seq_, queue_.dropped_count());
     broadcast(msg.dump());
 }
+
+void DashboardWsServer::broadcast_prices(
+    const std::map<std::string, std::vector<MessageTypes::ExchangePrice>>& prices) {
+    auto msg = MessageTypes::make_prices_message(prices);
+    broadcast(msg.dump());
+}
