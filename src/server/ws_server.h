@@ -29,11 +29,13 @@ public:
 
     // Typed broadcast helpers
     void broadcast_trade(const TradeRecord& trade);
-    void broadcast_spreads(const std::map<std::string,
+    void broadcast_spreads(const std::string& pair,
+                           const std::map<std::string,
                            std::map<std::string, std::pair<double, double>>>& spreads);
     void broadcast_balances(const std::map<Exchange,
                             std::unordered_map<std::string, double>>& balances);
-    void broadcast_pnl(double total_pnl, const std::map<std::string, double>& pnl_per_pair);
+    void broadcast_pnl(double total_pnl, const std::map<std::string, double>& pnl_per_pair,
+                        int total_trades, double win_rate, double total_fees);
     void broadcast_heartbeat();
 
 private:

@@ -20,18 +20,21 @@ nlohmann::json make_envelope(const std::string& type, const nlohmann::json& data
 /// Envelope for a single completed trade.
 nlohmann::json make_trade_message(const TradeRecord& trade);
 
-/// Envelope for the current spread matrix.
-/// Key layout: spreads[buy_exchange][sell_exchange] = {gross_bps, net_bps}
+/// Envelope for the current spread matrix for a single pair.
+/// Key layout: data[pair]["BUY->SELL"] = {gross_bps, net_bps}
 nlohmann::json make_spreads_message(
+    const std::string& pair,
     const std::map<std::string, std::map<std::string, std::pair<double, double>>>& spreads);
+
+/// Envelope for overall and per-pair PnL with trade stats.
+nlohmann::json make_pnl_message(double total_pnl,
+                                 const std::map<std::string, double>& pnl_per_pair,
+                                 int total_trades, double win_rate,
+                                 double total_fees);
 
 /// Envelope for the latest balances across all exchanges.
 nlohmann::json make_balances_message(
     const std::map<Exchange, std::unordered_map<std::string, double>>& balances);
-
-/// Envelope for overall and per-pair PnL.
-nlohmann::json make_pnl_message(double total_pnl,
-                                 const std::map<std::string, double>& pnl_per_pair);
 
 /// Heartbeat envelope (carries a monotonic sequence number and the number of
 /// messages dropped by the broadcast queue since start).

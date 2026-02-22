@@ -113,8 +113,9 @@ void DashboardWsServer::broadcast_trade(const TradeRecord& trade) {
 }
 
 void DashboardWsServer::broadcast_spreads(
+    const std::string& pair,
     const std::map<std::string, std::map<std::string, std::pair<double, double>>>& spreads) {
-    auto msg = MessageTypes::make_spreads_message(spreads);
+    auto msg = MessageTypes::make_spreads_message(pair, spreads);
     broadcast(msg.dump());
 }
 
@@ -125,8 +126,11 @@ void DashboardWsServer::broadcast_balances(
 }
 
 void DashboardWsServer::broadcast_pnl(double total_pnl,
-                                        const std::map<std::string, double>& pnl_per_pair) {
-    auto msg = MessageTypes::make_pnl_message(total_pnl, pnl_per_pair);
+                                        const std::map<std::string, double>& pnl_per_pair,
+                                        int total_trades, double win_rate,
+                                        double total_fees) {
+    auto msg = MessageTypes::make_pnl_message(total_pnl, pnl_per_pair,
+                                                total_trades, win_rate, total_fees);
     broadcast(msg.dump());
 }
 

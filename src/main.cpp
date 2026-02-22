@@ -248,69 +248,85 @@ int main(int argc, char **argv) {
   while (!g_shutdown) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    // Broadcast heartbeat
-    ws_server.broadcast_heartbeat();
+    try {
+      // Broadcast heartbeat
+      ws_server.broadcast_heartbeat();
 
-    // Broadcast balances
-    if (config.mode == TradingMode::PAPER && paper_executor) {
-      auto vb = paper_executor->get_virtual_balances();
-      std::map<Exchange, std::unordered_map<std::string, double>> balances_map;
-      for (auto &[exch, assets] : vb)
-        balances_map[exch] = assets;
-      ws_server.broadcast_balances(balances_map);
-    }
+      // Broadcast balances
+      if (config.mode == TradingMode::PAPER && paper_executor) {
+        auto vb = paper_executor->get_virtual_balances();
+        std::map<Exchange, std::unordered_map<std::string, double>> balances_map;
+        for (auto &[exch, assets] : vb)
+          balances_map[exch] = assets;
+        ws_server.broadcast_balances(balances_map);
+      }
 
-    // Broadcast spreads: top-of-book gross/net bps for every exchange pair
-    for (auto &pair : pairs) {
-      auto snapshots = aggregator.get_pair_snapshots(pair, 5);
-      if (snapshots.size() < 2) continue;
+      // Broadcast spreads: top-of-book gross/net bps for every exchange pair
+      for (auto &pair : pairs) {
+        auto snapshots = aggregator.get_pair_snapshots(pair, 5);
+        if (snapshots.size() < 2) continue;
 
-      std::map<std::string, std::map<std::string, std::pair<double, double>>> spread_matrix;
-      for (size_t i = 0; i < snapshots.size(); ++i) {
-        for (size_t j = 0; j < snapshots.size(); ++j) {
-          if (i == j) continue;
-          const auto &buy_book = snapshots[i];
-          const auto &sell_book = snapshots[j];
-          if (buy_book.asks.empty() || sell_book.bids.empty()) continue;
+        std::map<std::string, std::map<std::string, std::pair<double, double>>> spread_matrix;
+        for (size_t i = 0; i < snapshots.size(); ++i) {
+          for (size_t j = 0; j < snapshots.size(); ++j) {
+            if (i == j) continue;
+            const auto &buy_book = snapshots[i];
+            const auto &sell_book = snapshots[j];
+            if (buy_book.asks.empty() || sell_book.bids.empty()) continue;
 
-          double top_ask = buy_book.asks.front().price;
-          double top_bid = sell_book.bids.front().price;
-          if (top_ask <= 0.0) continue;
+            double top_ask = buy_book.asks.front().price;
+            double top_bid = sell_book.bids.front().price;
+            if (top_ask <= 0.0) continue;
 
-          double gross_bps = (top_bid - top_ask) / top_ask * 10000.0;
-          double fee_rate = fee_manager.total_fee_rate(
-              buy_book.exchange, sell_book.exchange, pair);
-          double net_bps = gross_bps - fee_rate * 10000.0;
+            double gross_bps = (top_bid - top_ask) / top_ask * 10000.0;
+            double fee_rate = fee_manager.total_fee_rate(
+                buy_book.exchange, sell_book.exchange, pair);
+            double net_bps = gross_bps - fee_rate * 10000.0;
 
-          spread_matrix[exchange_to_string(buy_book.exchange)]
-                       [exchange_to_string(sell_book.exchange)] = {gross_bps, net_bps};
+            spread_matrix[exchange_to_string(buy_book.exchange)]
+                         [exchange_to_string(sell_book.exchange)] = {gross_bps, net_bps};
+          }
+        }
+        if (!spread_matrix.empty()) {
+          ws_server.broadcast_spreads(pair, spread_matrix);
         }
       }
-      if (!spread_matrix.empty()) {
-        ws_server.broadcast_spreads(spread_matrix);
-      }
-    }
 
-    // Broadcast P&L
-    double total_pnl = (config.mode == TradingMode::PAPER && paper_executor)
-                           ? paper_executor->get_virtual_pnl()
-                           : trade_logger.total_realized_pnl();
-    std::map<std::string, double> pnl_per_pair;
-    for (auto &pair : pairs) {
-      pnl_per_pair[pair] = trade_logger.pnl_for_pair(pair);
-    }
-    ws_server.broadcast_pnl(total_pnl, pnl_per_pair);
-
-    // Check drift alerts
-    if (config.mode == TradingMode::LIVE) {
-      auto alerts = inventory_tracker.check_drift();
-      for (auto &alert : alerts) {
-        nlohmann::json alert_j;
-        to_json(alert_j, alert);
-        auto envelope = MessageTypes::make_envelope("alert", alert_j);
-        ws_server.broadcast(envelope.dump());
-        LOG_WARN("Drift: {}", alert.message);
+      // Broadcast P&L with trade stats
+      double total_pnl = (config.mode == TradingMode::PAPER && paper_executor)
+                             ? paper_executor->get_virtual_pnl()
+                             : trade_logger.total_realized_pnl();
+      std::map<std::string, double> pnl_per_pair;
+      for (auto &pair : pairs) {
+        pnl_per_pair[pair] = trade_logger.pnl_for_pair(pair);
       }
+
+      // Compute trade stats from trade logger
+      auto all_trades = trade_logger.load_all_trades();
+      int total_trades = static_cast<int>(all_trades.size());
+      int winning_trades = 0;
+      double total_fees = 0.0;
+      for (auto &t : all_trades) {
+        if (t.realized_pnl > 0) winning_trades++;
+        total_fees += t.buy_result.fee_paid + t.sell_result.fee_paid;
+      }
+      double win_rate = (total_trades > 0) ? (100.0 * winning_trades / total_trades) : 0.0;
+
+      ws_server.broadcast_pnl(total_pnl, pnl_per_pair, total_trades, win_rate, total_fees);
+
+      // Check drift alerts
+      if (config.mode == TradingMode::LIVE) {
+        auto alerts = inventory_tracker.check_drift();
+        for (auto &alert : alerts) {
+          nlohmann::json alert_j;
+          to_json(alert_j, alert);
+          auto envelope = MessageTypes::make_envelope("alert", alert_j);
+          ws_server.broadcast(envelope.dump());
+          LOG_WARN("Drift: {}", alert.message);
+        }
+      }
+    } catch (const std::exception &e) {
+      LOG_ERROR("Main loop error: {}", e.what());
     }
   }
 

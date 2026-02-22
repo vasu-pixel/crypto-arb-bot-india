@@ -71,7 +71,8 @@ class WsReceiver(threading.Thread):
                 if msg_type == "trade":
                     self.trades.appendleft(data)
                 elif msg_type == "spreads":
-                    self.spreads = data
+                    # Merge per-pair: each message has {pair: {routes}}
+                    self.spreads.update(data)
                 elif msg_type == "balances":
                     self.balances = data
                 elif msg_type == "pnl":

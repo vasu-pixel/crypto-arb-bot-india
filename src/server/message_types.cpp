@@ -30,19 +30,18 @@ nlohmann::json make_trade_message(const TradeRecord& trade) {
     data["timestamp"]         = trade.timestamp_iso;
     data["mode"]              = trading_mode_to_string(trade.mode);
 
-    // Buy result
-    data["buy_result"]["order_id"]        = trade.buy_result.exchange_order_id;
-    data["buy_result"]["status"]          = order_status_to_string(trade.buy_result.status);
-    data["buy_result"]["filled_quantity"] = trade.buy_result.filled_quantity;
-    data["buy_result"]["avg_fill_price"]  = trade.buy_result.avg_fill_price;
-    data["buy_result"]["fee_paid"]        = trade.buy_result.fee_paid;
+    // Flatten buy/sell result fields for dashboard compatibility
+    data["buy_order_id"]       = trade.buy_result.exchange_order_id;
+    data["buy_status"]         = order_status_to_string(trade.buy_result.status);
+    data["buy_filled_qty"]     = trade.buy_result.filled_quantity;
+    data["buy_fill_price"]     = trade.buy_result.avg_fill_price;
+    data["buy_fee"]            = trade.buy_result.fee_paid;
 
-    // Sell result
-    data["sell_result"]["order_id"]        = trade.sell_result.exchange_order_id;
-    data["sell_result"]["status"]          = order_status_to_string(trade.sell_result.status);
-    data["sell_result"]["filled_quantity"] = trade.sell_result.filled_quantity;
-    data["sell_result"]["avg_fill_price"]  = trade.sell_result.avg_fill_price;
-    data["sell_result"]["fee_paid"]        = trade.sell_result.fee_paid;
+    data["sell_order_id"]      = trade.sell_result.exchange_order_id;
+    data["sell_status"]        = order_status_to_string(trade.sell_result.status);
+    data["sell_filled_qty"]    = trade.sell_result.filled_quantity;
+    data["sell_fill_price"]    = trade.sell_result.avg_fill_price;
+    data["sell_fee"]           = trade.sell_result.fee_paid;
 
     return make_envelope("trade", data);
 }
@@ -50,20 +49,24 @@ nlohmann::json make_trade_message(const TradeRecord& trade) {
 // ── spreads ────────────────────────────────────────────────────────────────
 
 nlohmann::json make_spreads_message(
+    const std::string& pair,
     const std::map<std::string, std::map<std::string, std::pair<double, double>>>& spreads)
 {
-    nlohmann::json data = nlohmann::json::object();
+    // Build pair-keyed data with "BUY->SELL" arrow keys matching dashboard format
+    nlohmann::json pair_data = nlohmann::json::object();
 
     for (const auto& [buy_exch, sell_map] : spreads) {
-        nlohmann::json inner = nlohmann::json::object();
         for (const auto& [sell_exch, bps_pair] : sell_map) {
-            inner[sell_exch] = {
+            std::string key = buy_exch + "->" + sell_exch;
+            pair_data[key] = {
                 {"gross_bps", bps_pair.first},
                 {"net_bps",   bps_pair.second}
             };
         }
-        data[buy_exch] = inner;
     }
+
+    nlohmann::json data = nlohmann::json::object();
+    data[pair] = pair_data;
 
     return make_envelope("spreads", data);
 }
@@ -89,10 +92,15 @@ nlohmann::json make_balances_message(
 // ── pnl ────────────────────────────────────────────────────────────────────
 
 nlohmann::json make_pnl_message(double total_pnl,
-                                 const std::map<std::string, double>& pnl_per_pair)
+                                 const std::map<std::string, double>& pnl_per_pair,
+                                 int total_trades, double win_rate,
+                                 double total_fees)
 {
     nlohmann::json data;
-    data["total_pnl"] = total_pnl;
+    data["total_pnl"]    = total_pnl;
+    data["total_trades"]  = total_trades;
+    data["win_rate"]      = win_rate;
+    data["total_fees"]    = total_fees;
 
     nlohmann::json per_pair = nlohmann::json::object();
     for (const auto& [pair, pnl] : pnl_per_pair) {

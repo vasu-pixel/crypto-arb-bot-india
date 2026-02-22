@@ -166,7 +166,10 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity& opp) {
     update_virtual_balance(opp.sell_exchange, quote, sell_proceeds - record.sell_result.fee_paid);
 
     record.realized_pnl = sell_proceeds - buy_cost - record.buy_result.fee_paid - record.sell_result.fee_paid;
-    total_pnl_ += record.realized_pnl;
+    {
+        std::unique_lock lock(mutex_);
+        total_pnl_ += record.realized_pnl;
+    }
 
     trade_logger_.log_trade(record);
 

@@ -66,6 +66,8 @@ if trades:
             "quantity",
             "buy_fill_price",
             "sell_fill_price",
+            "buy_fee",
+            "sell_fee",
             "gross_spread_bps",
             "net_spread_bps",
             "realized_pnl",
