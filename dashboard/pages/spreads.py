@@ -28,7 +28,8 @@ prices = receiver.get_prices()
 if prices:
     st.subheader("Live Prices by Exchange")
     for pair in sorted(prices.keys()):
-        exchange_prices = prices[pair]
+        # Filter out exchanges with no data (bid=0 and ask=0)
+        exchange_prices = [ep for ep in prices[pair] if ep.get("bid", 0) > 0 or ep.get("ask", 0) > 0]
         if not exchange_prices:
             continue
         cols = st.columns(len(exchange_prices))

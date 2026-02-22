@@ -88,13 +88,15 @@ if prices:
     price_rows = []
     for pair, exchange_prices in sorted(prices.items()):
         for ep in exchange_prices:
+            bid = ep.get("bid", 0)
+            ask = ep.get("ask", 0)
+            if bid <= 0 and ask <= 0:
+                continue  # Skip exchanges with no data
             age_ms = ep.get("age_ms", 0)
             if age_ms < 1000:
                 latency_str = f"{age_ms}ms"
             else:
                 latency_str = f"{age_ms / 1000:.1f}s"
-            bid = ep.get("bid", 0)
-            ask = ep.get("ask", 0)
             spread_pct = ((ask - bid) / bid * 100) if bid > 0 else 0
             price_rows.append({
                 "Pair": pair,
