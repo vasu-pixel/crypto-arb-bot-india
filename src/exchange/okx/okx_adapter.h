@@ -2,20 +2,20 @@
 #include "exchange/exchange_interface.h"
 #include "exchange/rest_client.h"
 #include "exchange/ws_client.h"
-#include "exchange/binance/binance_auth.h"
-#include "exchange/binance/binance_rest.h"
-#include "exchange/binance/binance_ws.h"
+#include "exchange/okx/okx_auth.h"
+#include "exchange/okx/okx_rest.h"
+#include "exchange/okx/okx_ws.h"
 #include "common/config.h"
 #include <memory>
 #include <unordered_map>
 
-class BinanceAdapter : public IExchange {
+class OkxAdapter : public IExchange {
 public:
-    explicit BinanceAdapter(const Config& config);
-    ~BinanceAdapter() override = default;
+    explicit OkxAdapter(const Config& config);
+    ~OkxAdapter() override = default;
 
-    Exchange exchange_id() const override { return Exchange::BINANCE; }
-    std::string exchange_name() const override { return "BINANCE"; }
+    Exchange exchange_id() const override { return Exchange::OKX; }
+    std::string exchange_name() const override { return "OKX"; }
     std::string normalize_pair(const std::string& canonical_pair) const override;
     std::string canonical_pair(const std::string& native_pair) const override;
 
@@ -37,11 +37,11 @@ public:
 private:
     ExchangeConfig config_;
     std::unique_ptr<RestClient> rest_client_;
-    std::unique_ptr<BinanceAuth> auth_;
-    std::unique_ptr<BinanceRest> rest_;
+    std::unique_ptr<OkxAuth> auth_;
+    std::unique_ptr<OkxRest> rest_;
     std::unique_ptr<ExchangeWsClient> ws_client_;
-    std::unique_ptr<BinanceWs> ws_;
+    std::unique_ptr<OkxWs> ws_;
+    // Maps canonical "BTC-USDT" to OKX native "BTC-USDT" (same format)
     std::unordered_map<std::string, std::string> pair_map_;
-
     void build_pair_map();
 };

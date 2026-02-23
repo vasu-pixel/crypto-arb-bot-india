@@ -21,19 +21,18 @@ add_library(exchange STATIC
     exchange/binance/binance_rest.cpp
     exchange/binance/binance_ws.cpp
     exchange/binance/binance_adapter.cpp
-    exchange/kraken/kraken_auth.cpp
-    exchange/kraken/kraken_rest.cpp
-    exchange/kraken/kraken_ws.cpp
-    exchange/kraken/kraken_adapter.cpp
-    exchange/coinbase/coinbase_auth.cpp
-    exchange/coinbase/coinbase_rest.cpp
-    exchange/coinbase/coinbase_ws.cpp
-    exchange/coinbase/coinbase_adapter.cpp
+    exchange/okx/okx_auth.cpp
+    exchange/okx/okx_rest.cpp
+    exchange/okx/okx_ws.cpp
+    exchange/okx/okx_adapter.cpp
+    exchange/bybit/bybit_auth.cpp
+    exchange/bybit/bybit_rest.cpp
+    exchange/bybit/bybit_ws.cpp
+    exchange/bybit/bybit_adapter.cpp
 )
 target_link_libraries(exchange PUBLIC
     common
     CURL::libcurl
-    Boost::headers
     websocketpp
     Threads::Threads
     OpenSSL::SSL
@@ -87,7 +86,6 @@ add_library(ws_server_lib STATIC
 )
 target_link_libraries(ws_server_lib PUBLIC
     common
-    Boost::headers
     websocketpp
     Threads::Threads
 )

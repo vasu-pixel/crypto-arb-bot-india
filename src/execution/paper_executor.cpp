@@ -18,9 +18,9 @@ PaperExecutor::PaperExecutor(
     // Distribute initial balances across all exchanges equally
     for (auto& [asset, amount] : initial_balances) {
         double per_exchange = amount / 3.0;
-        virtual_balances_[Exchange::BINANCE_US][asset] = per_exchange;
-        virtual_balances_[Exchange::KRAKEN][asset] = per_exchange;
-        virtual_balances_[Exchange::COINBASE][asset] = per_exchange;
+        virtual_balances_[Exchange::BINANCE][asset] = per_exchange;
+        virtual_balances_[Exchange::OKX][asset] = per_exchange;
+        virtual_balances_[Exchange::BYBIT][asset] = per_exchange;
     }
 }
 
@@ -31,7 +31,7 @@ std::string PaperExecutor::extract_base_asset(const std::string& pair) const {
 
 std::string PaperExecutor::extract_quote_asset(const std::string& pair) const {
     auto pos = pair.find('-');
-    return (pos != std::string::npos) ? pair.substr(pos + 1) : "USD";
+    return (pos != std::string::npos) ? pair.substr(pos + 1) : "USDT";
 }
 
 bool PaperExecutor::check_virtual_balance(Exchange exch, const std::string& asset,

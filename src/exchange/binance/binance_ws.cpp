@@ -83,7 +83,7 @@ void BinanceWs::parse_depth_snapshot(const nlohmann::json &j,
                                      const std::string &symbol) {
   try {
     OrderBookSnapshot snap;
-    snap.exchange = Exchange::BINANCE_US;
+    snap.exchange = Exchange::BINANCE;
     snap.pair = symbol;
     snap.sequence_id = j.value("lastUpdateId", 0ULL);
     snap.local_timestamp = std::chrono::steady_clock::now();

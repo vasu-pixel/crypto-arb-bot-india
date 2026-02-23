@@ -2,20 +2,20 @@
 #include "exchange/exchange_interface.h"
 #include "exchange/rest_client.h"
 #include "exchange/ws_client.h"
-#include "exchange/binance/binance_auth.h"
-#include "exchange/binance/binance_rest.h"
-#include "exchange/binance/binance_ws.h"
+#include "exchange/bybit/bybit_auth.h"
+#include "exchange/bybit/bybit_rest.h"
+#include "exchange/bybit/bybit_ws.h"
 #include "common/config.h"
 #include <memory>
 #include <unordered_map>
 
-class BinanceAdapter : public IExchange {
+class BybitAdapter : public IExchange {
 public:
-    explicit BinanceAdapter(const Config& config);
-    ~BinanceAdapter() override = default;
+    explicit BybitAdapter(const Config& config);
+    ~BybitAdapter() override = default;
 
-    Exchange exchange_id() const override { return Exchange::BINANCE; }
-    std::string exchange_name() const override { return "BINANCE"; }
+    Exchange exchange_id() const override { return Exchange::BYBIT; }
+    std::string exchange_name() const override { return "BYBIT"; }
     std::string normalize_pair(const std::string& canonical_pair) const override;
     std::string canonical_pair(const std::string& native_pair) const override;
 
@@ -37,11 +37,11 @@ public:
 private:
     ExchangeConfig config_;
     std::unique_ptr<RestClient> rest_client_;
-    std::unique_ptr<BinanceAuth> auth_;
-    std::unique_ptr<BinanceRest> rest_;
+    std::unique_ptr<BybitAuth> auth_;
+    std::unique_ptr<BybitRest> rest_;
     std::unique_ptr<ExchangeWsClient> ws_client_;
-    std::unique_ptr<BinanceWs> ws_;
+    std::unique_ptr<BybitWs> ws_;
+    // Maps canonical "BTC-USDT" to Bybit native "BTCUSDT"
     std::unordered_map<std::string, std::string> pair_map_;
-
     void build_pair_map();
 };

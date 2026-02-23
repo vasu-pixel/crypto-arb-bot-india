@@ -17,12 +17,12 @@ BacktestMetrics BacktestEngine::run(const std::vector<HistoricalSnapshot>& data)
     trades_.clear();
 
     // Create simulated exchanges with realistic per-exchange fee rates
-    // Binance US: 0.1% maker/taker, Kraken: 0.16%/0.26%, Coinbase: 0.4%/0.6%
+    // Binance: 0.1% maker/taker, OKX: 0.08%/0.10%, Bybit: 0.1%/0.1%
     struct ExchangeFees { Exchange id; double maker; double taker; };
     std::vector<ExchangeFees> exch_fees = {
-        {Exchange::BINANCE_US, 0.001,  0.001},
-        {Exchange::KRAKEN,     0.0016, 0.0026},
-        {Exchange::COINBASE,   0.004,  0.006},
+        {Exchange::BINANCE, 0.001,  0.001},
+        {Exchange::OKX,     0.0008, 0.001},
+        {Exchange::BYBIT,   0.001,  0.001},
     };
 
     std::map<Exchange, std::unique_ptr<SimulatedExchange>> sim_exchanges;

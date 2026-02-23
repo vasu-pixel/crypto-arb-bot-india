@@ -1,27 +1,27 @@
 {
   "mode": "paper",
   "exchanges": {
-    "binance_us": {
+    "binance": {
       "api_key": "ENV:BINANCE_API_KEY",
       "secret_key": "ENV:BINANCE_SECRET_KEY",
-      "rest_base_url": "https://api.binance.us",
-      "ws_base_url": "wss://stream.binance.us:9443/ws"
+      "rest_base_url": "https://api.binance.com",
+      "ws_base_url": "wss://stream.binance.com:9443/ws"
     },
-    "kraken": {
-      "api_key": "ENV:KRAKEN_API_KEY",
-      "secret_key": "ENV:KRAKEN_SECRET_KEY",
-      "rest_base_url": "https://api.kraken.com",
-      "ws_base_url": "wss://ws.kraken.com/v2"
+    "okx": {
+      "api_key": "ENV:OKX_API_KEY",
+      "secret_key": "ENV:OKX_SECRET_KEY",
+      "rest_base_url": "https://www.okx.com",
+      "ws_base_url": "wss://ws.okx.com:8443/ws/v5/public"
     },
-    "coinbase": {
-      "api_key": "ENV:COINBASE_API_KEY",
-      "secret_key": "ENV:COINBASE_SECRET_KEY",
-      "rest_base_url": "https://api.coinbase.com",
-      "ws_base_url": "wss://advanced-trade-ws.coinbase.com"
+    "bybit": {
+      "api_key": "ENV:BYBIT_API_KEY",
+      "secret_key": "ENV:BYBIT_SECRET_KEY",
+      "rest_base_url": "https://api.bybit.com",
+      "ws_base_url": "wss://stream.bybit.com/v5/public/spot"
     }
   },
   "strategy": {
-    "min_net_spread_bps": 3.0,
+    "min_net_spread_bps": 2.0,
     "min_trade_size_usd": 10.0,
     "max_trade_size_usd": 100.0,
     "max_open_positions": 3,
@@ -50,7 +50,7 @@
   },
   "paper_trading": {
     "initial_balances": {
-      "USD": 700.0,
+      "USDT": 700.0,
       "BTC": 0.002,
       "ETH": 0.05,
       "SOL": 1.0

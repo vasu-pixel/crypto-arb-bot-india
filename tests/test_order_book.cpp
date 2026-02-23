@@ -3,7 +3,7 @@
 
 class OrderBookTest : public ::testing::Test {
 protected:
-    OrderBook book{Exchange::BINANCE_US, "BTC-USD"};
+    OrderBook book{Exchange::BINANCE, "BTC-USDT"};
 };
 
 TEST_F(OrderBookTest, EmptyBookHasNoLevels) {
@@ -99,8 +99,8 @@ TEST_F(OrderBookTest, SnapshotPreservesExchangeAndPair) {
     book.apply_snapshot(bids, asks, 1);
 
     auto snap = book.snapshot();
-    EXPECT_EQ(snap.exchange, Exchange::BINANCE_US);
-    EXPECT_EQ(snap.pair, "BTC-USD");
+    EXPECT_EQ(snap.exchange, Exchange::BINANCE);
+    EXPECT_EQ(snap.pair, "BTC-USDT");
 }
 
 TEST_F(OrderBookTest, SnapshotDepthLimited) {

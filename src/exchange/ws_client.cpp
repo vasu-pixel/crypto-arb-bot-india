@@ -211,18 +211,18 @@ bool ExchangeWsClient::on_ping(ConnectionHdl hdl, std::string payload) {
 
 ExchangeWsClient::SslContext
 ExchangeWsClient::on_tls_init(ConnectionHdl /*hdl*/) {
-  auto ctx = std::make_shared<boost::asio::ssl::context>(
-      boost::asio::ssl::context::tlsv12_client);
+  auto ctx = std::make_shared<asio::ssl::context>(
+      asio::ssl::context::tlsv12_client);
 
   try {
-    ctx->set_options(boost::asio::ssl::context::default_workarounds |
-                     boost::asio::ssl::context::no_sslv2 |
-                     boost::asio::ssl::context::no_sslv3 |
-                     boost::asio::ssl::context::single_dh_use);
+    ctx->set_options(asio::ssl::context::default_workarounds |
+                     asio::ssl::context::no_sslv2 |
+                     asio::ssl::context::no_sslv3 |
+                     asio::ssl::context::single_dh_use);
 
     ctx->set_default_verify_paths();
     // Disable rigorous peer verification for debugging
-    ctx->set_verify_mode(boost::asio::ssl::verify_none);
+    ctx->set_verify_mode(asio::ssl::verify_none);
   } catch (const std::exception &e) {
     LOG_ERROR("ExchangeWsClient: TLS init error: {}", e.what());
   }

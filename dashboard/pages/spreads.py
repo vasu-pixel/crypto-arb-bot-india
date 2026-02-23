@@ -19,7 +19,7 @@ def get_ws_receiver():
 
 
 receiver = get_ws_receiver()
-EXCHANGES = ["BINANCE_US", "KRAKEN", "COINBASE"]
+EXCHANGES = ["BINANCE", "OKX", "BYBIT"]
 
 st.title("Spread Monitor")
 

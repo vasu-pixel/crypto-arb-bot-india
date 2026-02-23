@@ -70,21 +70,21 @@ static FeeInfo default_fee_for_exchange(Exchange exch, const std::string& pair)
     // Conservative default fees per exchange when API fees are unavailable
     // (e.g., no API key configured). These are standard retail taker/maker rates.
     switch (exch) {
-        case Exchange::BINANCE_US:
+        case Exchange::BINANCE:
             info.maker_fee = 0.001;   // 0.10%
             info.taker_fee = 0.001;   // 0.10%
             break;
-        case Exchange::KRAKEN:
-            info.maker_fee = 0.0016;  // 0.16%
-            info.taker_fee = 0.0026;  // 0.26%
+        case Exchange::OKX:
+            info.maker_fee = 0.0008;  // 0.08%
+            info.taker_fee = 0.001;   // 0.10%
             break;
-        case Exchange::COINBASE:
-            info.maker_fee = 0.004;   // 0.40%
-            info.taker_fee = 0.006;   // 0.60%
+        case Exchange::BYBIT:
+            info.maker_fee = 0.001;   // 0.10%
+            info.taker_fee = 0.001;   // 0.10%
             break;
         default:
-            info.maker_fee = 0.002;   // 0.20% conservative default
-            info.taker_fee = 0.004;   // 0.40% conservative default
+            info.maker_fee = 0.001;   // 0.10% conservative default
+            info.taker_fee = 0.001;   // 0.10% conservative default
             break;
     }
     return info;

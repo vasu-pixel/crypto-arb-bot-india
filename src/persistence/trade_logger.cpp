@@ -53,8 +53,8 @@ static OrderStatus parse_order_status(const std::string& s) {
 void from_json(const nlohmann::json& j, TradeRecord& r) {
     r.id = j.value("id", "");
     r.pair = j.value("pair", "");
-    r.buy_exchange = exchange_from_string(j.value("buy_exchange", "BINANCE_US"));
-    r.sell_exchange = exchange_from_string(j.value("sell_exchange", "KRAKEN"));
+    r.buy_exchange = exchange_from_string(j.value("buy_exchange", "BINANCE"));
+    r.sell_exchange = exchange_from_string(j.value("sell_exchange", "OKX"));
     r.buy_price = j.value("buy_price", 0.0);
     r.sell_price = j.value("sell_price", 0.0);
     r.quantity = j.value("quantity", 0.0);

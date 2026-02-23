@@ -5,10 +5,10 @@
 #include <stdexcept>
 
 BinanceAdapter::BinanceAdapter(const Config &config) {
-  auto it = config.exchanges.find(Exchange::BINANCE_US);
+  auto it = config.exchanges.find(Exchange::BINANCE);
   if (it == config.exchanges.end()) {
     throw std::runtime_error(
-        "BinanceAdapter: no exchange config for BINANCE_US");
+        "BinanceAdapter: no exchange config for BINANCE");
   }
   config_ = it->second;
   rest_client_ = std::make_unique<RestClient>(config_.rest_base_url);
@@ -22,19 +22,19 @@ BinanceAdapter::BinanceAdapter(const Config &config) {
 }
 
 void BinanceAdapter::build_pair_map() {
-  // Common Binance.US pairs: canonical -> native
-  pair_map_["BTC-USD"] = "BTCUSD";
-  pair_map_["ETH-USD"] = "ETHUSD";
-  pair_map_["SOL-USD"] = "SOLUSD";
-  pair_map_["XRP-USD"] = "XRPUSD";
-  pair_map_["ADA-USD"] = "ADAUSD";
-  pair_map_["DOGE-USD"] = "DOGEUSD";
-  pair_map_["DOT-USD"] = "DOTUSD";
-  pair_map_["LINK-USD"] = "LINKUSD";
-  pair_map_["AVAX-USD"] = "AVAXUSD";
-  pair_map_["MATIC-USD"] = "MATICUSD";
+  // Binance Global USDT pairs: canonical -> native
   pair_map_["BTC-USDT"] = "BTCUSDT";
   pair_map_["ETH-USDT"] = "ETHUSDT";
+  pair_map_["SOL-USDT"] = "SOLUSDT";
+  pair_map_["XRP-USDT"] = "XRPUSDT";
+  pair_map_["ADA-USDT"] = "ADAUSDT";
+  pair_map_["DOGE-USDT"] = "DOGEUSDT";
+  pair_map_["DOT-USDT"] = "DOTUSDT";
+  pair_map_["LINK-USDT"] = "LINKUSDT";
+  pair_map_["AVAX-USDT"] = "AVAXUSDT";
+  pair_map_["MATIC-USDT"] = "MATICUSDT";
+  pair_map_["ARB-USDT"] = "ARBUSDT";
+  pair_map_["OP-USDT"] = "OPUSDT";
 }
 
 std::string
@@ -74,11 +74,11 @@ OrderBookSnapshot BinanceAdapter::fetch_order_book(const std::string &pair,
 std::vector<std::pair<std::string, double>>
 BinanceAdapter::fetch_top_pairs_by_volume(int limit) {
   auto tickers = rest_->fetch_24h_tickers();
-  // Filter for USD/USDT pairs and sort by volume
+  // Filter for USDT pairs and sort by volume
   std::vector<std::pair<std::string, double>> result;
   for (auto &ticker : tickers) {
     std::string canonical = canonical_pair(ticker.symbol);
-    if (canonical.find("-USD") != std::string::npos) {
+    if (canonical.find("-USDT") != std::string::npos) {
       result.push_back({canonical, ticker.volume});
     }
   }
@@ -150,12 +150,12 @@ void BinanceAdapter::connect() {
   }
 
   ws_client_->connect();
-  LOG_INFO("Binance.US adapter connected");
+  LOG_INFO("Binance adapter connected");
 }
 
 void BinanceAdapter::disconnect() {
   ws_client_->disconnect();
-  LOG_INFO("Binance.US adapter disconnected");
+  LOG_INFO("Binance adapter disconnected");
 }
 
 bool BinanceAdapter::is_connected() const { return ws_client_->is_connected(); }

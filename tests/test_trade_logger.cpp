@@ -21,9 +21,9 @@ protected:
     TradeRecord make_trade(const std::string& id, double pnl) {
         TradeRecord t;
         t.id = id;
-        t.pair = "BTC-USD";
-        t.buy_exchange = Exchange::BINANCE_US;
-        t.sell_exchange = Exchange::KRAKEN;
+        t.pair = "BTC-USDT";
+        t.buy_exchange = Exchange::BINANCE;
+        t.sell_exchange = Exchange::OKX;
         t.buy_price = 100000.0;
         t.sell_price = 100050.0;
         t.quantity = 0.01;
@@ -50,7 +50,7 @@ TEST_F(TradeLoggerTest, LogAndLoadSingleTrade) {
     auto trades = logger.load_all_trades();
     ASSERT_EQ(trades.size(), 1u);
     EXPECT_EQ(trades[0].id, "trade_1");
-    EXPECT_EQ(trades[0].pair, "BTC-USD");
+    EXPECT_EQ(trades[0].pair, "BTC-USDT");
     EXPECT_DOUBLE_EQ(trades[0].realized_pnl, 0.50);
     EXPECT_EQ(trades[0].mode, TradingMode::PAPER);
 }
@@ -81,22 +81,22 @@ TEST_F(TradeLoggerTest, TotalRealizedPnl) {
 TEST_F(TradeLoggerTest, PnlForPair) {
     TradeLogger logger(test_file);
     auto t1 = make_trade("t1", 0.10);
-    t1.pair = "BTC-USD";
+    t1.pair = "BTC-USDT";
 
     auto t2 = make_trade("t2", 0.20);
-    t2.pair = "ETH-USD";
+    t2.pair = "ETH-USDT";
 
     auto t3 = make_trade("t3", 0.30);
-    t3.pair = "BTC-USD";
+    t3.pair = "BTC-USDT";
 
     logger.log_trade(t1);
     logger.log_trade(t2);
     logger.log_trade(t3);
 
-    double btc_pnl = logger.pnl_for_pair("BTC-USD");
+    double btc_pnl = logger.pnl_for_pair("BTC-USDT");
     EXPECT_NEAR(btc_pnl, 0.40, 0.001);
 
-    double eth_pnl = logger.pnl_for_pair("ETH-USD");
+    double eth_pnl = logger.pnl_for_pair("ETH-USDT");
     EXPECT_NEAR(eth_pnl, 0.20, 0.001);
 }
 

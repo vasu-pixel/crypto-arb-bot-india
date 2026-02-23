@@ -125,14 +125,14 @@ int main(int argc, char **argv) {
   }
 
   // Create exchange adapters
-  auto binance = ExchangeFactory::create(Exchange::BINANCE_US, config);
-  auto kraken = ExchangeFactory::create(Exchange::KRAKEN, config);
-  auto coinbase = ExchangeFactory::create(Exchange::COINBASE, config);
+  auto binance = ExchangeFactory::create(Exchange::BINANCE, config);
+  auto okx = ExchangeFactory::create(Exchange::OKX, config);
+  auto bybit = ExchangeFactory::create(Exchange::BYBIT, config);
 
   std::unordered_map<Exchange, IExchange *> exchanges = {
-      {Exchange::BINANCE_US, binance.get()},
-      {Exchange::KRAKEN, kraken.get()},
-      {Exchange::COINBASE, coinbase.get()},
+      {Exchange::BINANCE, binance.get()},
+      {Exchange::OKX, okx.get()},
+      {Exchange::BYBIT, bybit.get()},
   };
 
   // Discover top pairs
@@ -142,13 +142,13 @@ int main(int argc, char **argv) {
   //     return 1;
   // }
 
-  // Hardcoded pairs to bypass REST API discovery and run without API keys
+  // Hardcoded USDT pairs for India trading
   // Must use canonical "BASE-QUOTE" format used throughout the codebase
-  std::vector<std::string> pairs = {"BTC-USD", "ETH-USD", "SOL-USD"};
+  std::vector<std::string> pairs = {"BTC-USDT", "ETH-USDT", "SOL-USDT"};
 
   // Initialize fee manager
-  std::vector<IExchange *> exch_ptrs = {binance.get(), kraken.get(),
-                                        coinbase.get()};
+  std::vector<IExchange *> exch_ptrs = {binance.get(), okx.get(),
+                                        bybit.get()};
   FeeManager fee_manager(exch_ptrs);
   try {
     fee_manager.refresh_all_fees();

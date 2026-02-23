@@ -1,6 +1,6 @@
 import plotly.graph_objects as go
 
-EXCHANGES = ["BINANCE_US", "KRAKEN", "COINBASE"]
+EXCHANGES = ["BINANCE", "OKX", "BYBIT"]
 
 
 def create_spread_heatmap(pair_spreads, pair_name=""):

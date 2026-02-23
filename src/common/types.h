@@ -7,7 +7,7 @@
 #include <optional>
 #include <nlohmann/json.hpp>
 
-enum class Exchange { BINANCE_US, KRAKEN, COINBASE };
+enum class Exchange { BINANCE, OKX, BYBIT };
 
 // Hash specialization so Exchange can be used as key in unordered_map
 namespace std {
@@ -24,17 +24,17 @@ enum class TradingMode { LIVE, PAPER, BACKTEST };
 
 inline std::string exchange_to_string(Exchange e) {
     switch (e) {
-        case Exchange::BINANCE_US: return "BINANCE_US";
-        case Exchange::KRAKEN:     return "KRAKEN";
-        case Exchange::COINBASE:   return "COINBASE";
+        case Exchange::BINANCE: return "BINANCE";
+        case Exchange::OKX:     return "OKX";
+        case Exchange::BYBIT:   return "BYBIT";
     }
     return "UNKNOWN";
 }
 
 inline Exchange exchange_from_string(const std::string& s) {
-    if (s == "BINANCE_US") return Exchange::BINANCE_US;
-    if (s == "KRAKEN")     return Exchange::KRAKEN;
-    if (s == "COINBASE")   return Exchange::COINBASE;
+    if (s == "BINANCE") return Exchange::BINANCE;
+    if (s == "OKX")     return Exchange::OKX;
+    if (s == "BYBIT")   return Exchange::BYBIT;
     throw std::runtime_error("Unknown exchange: " + s);
 }
 

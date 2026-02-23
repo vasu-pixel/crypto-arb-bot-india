@@ -38,31 +38,31 @@ Config Config::load(const std::string& filepath) {
 
     // Exchanges
     auto& exch = j["exchanges"];
-    if (exch.contains("binance_us")) {
-        auto& b = exch["binance_us"];
-        config.exchanges[Exchange::BINANCE_US] = {
+    if (exch.contains("binance")) {
+        auto& b = exch["binance"];
+        config.exchanges[Exchange::BINANCE] = {
             resolve_env(b.value("api_key", "")),
             resolve_env(b.value("secret_key", "")),
-            b.value("rest_base_url", "https://api.binance.us"),
-            b.value("ws_base_url", "wss://stream.binance.us:9443/ws")
+            b.value("rest_base_url", "https://api.binance.com"),
+            b.value("ws_base_url", "wss://stream.binance.com:9443/ws")
         };
     }
-    if (exch.contains("kraken")) {
-        auto& k = exch["kraken"];
-        config.exchanges[Exchange::KRAKEN] = {
+    if (exch.contains("okx")) {
+        auto& k = exch["okx"];
+        config.exchanges[Exchange::OKX] = {
             resolve_env(k.value("api_key", "")),
             resolve_env(k.value("secret_key", "")),
-            k.value("rest_base_url", "https://api.kraken.com"),
-            k.value("ws_base_url", "wss://ws.kraken.com/v2")
+            k.value("rest_base_url", "https://www.okx.com"),
+            k.value("ws_base_url", "wss://ws.okx.com:8443/ws/v5/public")
         };
     }
-    if (exch.contains("coinbase")) {
-        auto& c = exch["coinbase"];
-        config.exchanges[Exchange::COINBASE] = {
+    if (exch.contains("bybit")) {
+        auto& c = exch["bybit"];
+        config.exchanges[Exchange::BYBIT] = {
             resolve_env(c.value("api_key", "")),
             resolve_env(c.value("secret_key", "")),
-            c.value("rest_base_url", "https://api.coinbase.com"),
-            c.value("ws_base_url", "wss://advanced-trade-ws.coinbase.com")
+            c.value("rest_base_url", "https://api.bybit.com"),
+            c.value("ws_base_url", "wss://stream.bybit.com/v5/public/spot")
         };
     }
 

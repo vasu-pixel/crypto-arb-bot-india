@@ -6,8 +6,8 @@ class DepthAnalyzerTest : public ::testing::Test {
 protected:
     OrderBookSnapshot make_book() {
         OrderBookSnapshot snap;
-        snap.exchange = Exchange::BINANCE_US;
-        snap.pair = "BTC-USD";
+        snap.exchange = Exchange::BINANCE;
+        snap.pair = "BTC-USDT";
         // 3 bid levels (best first: descending)
         snap.bids = {
             {100000.0, 1.0},
@@ -75,8 +75,8 @@ TEST_F(DepthAnalyzerTest, InsufficientLiquidity) {
 
 TEST_F(DepthAnalyzerTest, EmptyBookNotFillable) {
     OrderBookSnapshot empty;
-    empty.exchange = Exchange::BINANCE_US;
-    empty.pair = "BTC-USD";
+    empty.exchange = Exchange::BINANCE;
+    empty.pair = "BTC-USDT";
 
     auto buy_result = DepthAnalyzer::effective_buy_price(empty, 1.0);
     EXPECT_FALSE(buy_result.fully_fillable);
@@ -90,8 +90,8 @@ TEST_F(DepthAnalyzerTest, EmptyBookNotFillable) {
 TEST_F(DepthAnalyzerTest, MaxArbQuantityPositiveSpread) {
     auto buy_book = make_book();  // asks start at 100010
     OrderBookSnapshot sell_book;
-    sell_book.exchange = Exchange::KRAKEN;
-    sell_book.pair = "BTC-USD";
+    sell_book.exchange = Exchange::OKX;
+    sell_book.pair = "BTC-USDT";
     sell_book.bids = {
         {100050.0, 1.0},
         {100040.0, 2.0},
@@ -108,8 +108,8 @@ TEST_F(DepthAnalyzerTest, MaxArbQuantityPositiveSpread) {
 TEST_F(DepthAnalyzerTest, MaxArbQuantityNoOpportunity) {
     auto buy_book = make_book();  // asks start at 100010
     OrderBookSnapshot sell_book;
-    sell_book.exchange = Exchange::KRAKEN;
-    sell_book.pair = "BTC-USD";
+    sell_book.exchange = Exchange::OKX;
+    sell_book.pair = "BTC-USDT";
     sell_book.bids = {
         {100005.0, 1.0},
         {100000.0, 2.0}

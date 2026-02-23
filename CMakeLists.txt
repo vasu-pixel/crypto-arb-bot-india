@@ -14,7 +14,6 @@ include(cmake/FetchDependencies.cmake)
 find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost REQUIRED)
 
 add_subdirectory(src)
 

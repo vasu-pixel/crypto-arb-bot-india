@@ -13,7 +13,7 @@
 class ExchangeWsClient {
 public:
     using WsClient = websocketpp::client<websocketpp::config::asio_tls_client>;
-    using SslContext = websocketpp::lib::shared_ptr<boost::asio::ssl::context>;
+    using SslContext = websocketpp::lib::shared_ptr<asio::ssl::context>;
     using ConnectionHdl = websocketpp::connection_hdl;
     using MessagePtr = WsClient::message_ptr;
 

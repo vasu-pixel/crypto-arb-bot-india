@@ -8,8 +8,8 @@
 
 // Forward declarations for exchange adapters
 class BinanceAdapter;
-class KrakenAdapter;
-class CoinbaseAdapter;
+class OkxAdapter;
+class BybitAdapter;
 
 class ExchangeFactory {
 public:

@@ -31,7 +31,7 @@ OrderBookSnapshot BinanceRest::fetch_order_book(const std::string& symbol, int d
 
     auto j = json::parse(resp.body);
     OrderBookSnapshot snap;
-    snap.exchange = Exchange::BINANCE_US;
+    snap.exchange = Exchange::BINANCE;
     snap.pair = symbol;
     snap.sequence_id = j.value("lastUpdateId", uint64_t(0));
     snap.local_timestamp = std::chrono::steady_clock::now();
@@ -89,7 +89,7 @@ FeeInfo BinanceRest::fetch_trade_fee(const std::string& symbol) {
 
     auto arr = json::parse(resp.body);
     FeeInfo fee;
-    fee.exchange = Exchange::BINANCE_US;
+    fee.exchange = Exchange::BINANCE;
     fee.pair = symbol;
 
     if (!arr.empty()) {
@@ -97,7 +97,7 @@ FeeInfo BinanceRest::fetch_trade_fee(const std::string& symbol) {
         fee.maker_fee = std::stod(item.value("makerCommission", "0.001"));
         fee.taker_fee = std::stod(item.value("takerCommission", "0.001"));
     } else {
-        // Default Binance US fees
+        // Default Binance Global fees
         fee.maker_fee = 0.001;
         fee.taker_fee = 0.001;
     }
@@ -193,7 +193,7 @@ std::vector<BalanceInfo> BinanceRest::fetch_account() {
         // Only include non-zero balances
         if (free_amt > 0.0 || locked_amt > 0.0) {
             BalanceInfo info;
-            info.exchange = Exchange::BINANCE_US;
+            info.exchange = Exchange::BINANCE;
             info.asset = bal.value("asset", "");
             info.free = free_amt;
             info.locked = locked_amt;
