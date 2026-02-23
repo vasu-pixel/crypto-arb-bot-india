@@ -87,7 +87,7 @@ Config Config::load(const std::string& filepath) {
     // Server
     if (j.contains("server")) {
         auto& srv = j["server"];
-        config.ws_port = srv.value("ws_port", 9002);
+        config.ws_port = srv.value("ws_port", 9003);
         config.heartbeat_interval_s = srv.value("heartbeat_interval_s", 5);
     }
 

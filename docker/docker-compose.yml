@@ -8,7 +8,7 @@ services:
     container_name: arb-bot
     restart: unless-stopped
     ports:
-      - "9002:9002"
+      - "9003:9003"
     volumes:
       - ../data:/app/data
       - ../config:/app/config:ro
@@ -27,7 +27,7 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - ARB_BOT_WS_URL=ws://arb-bot:9002
+      - ARB_BOT_WS_URL=ws://arb-bot:9003
       - ARB_BOT_MODE=${ARB_BOT_MODE:-PAPER}
       - BACKTEST_RESULTS=/app/data/backtest_results.json
     volumes:

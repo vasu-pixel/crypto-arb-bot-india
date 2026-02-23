@@ -113,7 +113,7 @@ EXTERNAL_IP=$(gcloud compute instances describe "$INSTANCE" \
 echo ""
 echo "=== Deployment Complete ==="
 echo "Dashboard: http://${EXTERNAL_IP}:8501"
-echo "Bot WS:    ws://${EXTERNAL_IP}:9002"
+echo "Bot WS:    ws://${EXTERNAL_IP}:9003"
 echo ""
 echo "Useful commands:"
 echo "  # SSH into VM"

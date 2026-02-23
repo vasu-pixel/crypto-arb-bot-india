@@ -15,7 +15,7 @@ class WsReceiver(threading.Thread):
     that Streamlit pages read from.
     """
 
-    def __init__(self, url="ws://localhost:9002", max_buffer=1000):
+    def __init__(self, url="ws://localhost:9003", max_buffer=1000):
         super().__init__(daemon=True)
         self.url = url
         self.max_buffer = max_buffer

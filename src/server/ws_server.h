@@ -18,7 +18,7 @@ using WsServer = websocketpp::server<websocketpp::config::asio>;
 
 class DashboardWsServer {
 public:
-    explicit DashboardWsServer(uint16_t port = 9002);
+    explicit DashboardWsServer(uint16_t port = 9003);
     ~DashboardWsServer();
 
     void start();

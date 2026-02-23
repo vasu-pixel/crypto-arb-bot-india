@@ -30,6 +30,6 @@ COPY config/ config/
 
 RUN mkdir -p data logs data/historical
 
-EXPOSE 9002
+EXPOSE 9003
 
 CMD ["./arb_bot", "--config", "config/config.json"]

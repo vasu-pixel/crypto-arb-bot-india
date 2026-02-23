@@ -12,7 +12,7 @@ import os
 
 @st.cache_resource
 def get_ws_receiver():
-    url = os.environ.get("ARB_BOT_WS_URL", "ws://localhost:9002")
+    url = os.environ.get("ARB_BOT_WS_URL", "ws://localhost:9003")
     receiver = WsReceiver(url=url)
     receiver.start()
     return receiver

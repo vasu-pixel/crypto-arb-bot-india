@@ -27,7 +27,7 @@ struct Config {
     int balance_refresh_interval_s = 30;
 
     // Server
-    uint16_t ws_port = 9002;
+    uint16_t ws_port = 9003;
     int heartbeat_interval_s = 5;
 
     // Persistence

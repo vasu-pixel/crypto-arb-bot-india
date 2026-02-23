@@ -33,7 +33,7 @@
     "balance_refresh_interval_s": 30
   },
   "server": {
-    "ws_port": 9002,
+    "ws_port": 9003,
     "heartbeat_interval_s": 5
   },
   "persistence": {
