@@ -29,14 +29,14 @@ if balances:
     cols = st.columns(len(balances))
     for i, (exchange, assets) in enumerate(sorted(balances.items())):
         with cols[i]:
-            st.subheader(exchange.replace("_", "."))
+            st.subheader(exchange)
             total_usd = 0
             for asset, amount in sorted(assets.items()):
                 if isinstance(amount, (int, float)):
                     st.text(f"{asset}: {amount:.6f}")
                     if asset in ("USD", "USDT", "USDC"):
                         total_usd += amount
-            st.metric("USD Value", f"${total_usd:,.2f}")
+            st.metric("USDT Value", f"${total_usd:,.2f}")
 
     st.divider()
 
@@ -56,7 +56,7 @@ if balances:
         exchange_names = []
         amounts = []
         for exchange, assets in sorted(balances.items()):
-            exchange_names.append(exchange.replace("_", "."))
+            exchange_names.append(exchange)
             amounts.append(assets.get(selected_asset, 0))
 
         fig = go.Figure(

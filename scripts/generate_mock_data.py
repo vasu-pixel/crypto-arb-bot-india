@@ -19,10 +19,10 @@ def generate_mock_data():
         writer.writerow(header)
         
         base_time = int(time.time() * 1000) - 86400000  # 1 day ago
-        pairs = ['BTC/USDT', 'ETH/USDT']
+        pairs = ['BTC-USDT', 'ETH-USDT']
         exchanges = ['BINANCE', 'OKX', 'BYBIT']
-        
-        base_prices = {'BTC/USDT': 50000.0, 'ETH/USDT': 3000.0}
+
+        base_prices = {'BTC-USDT': 50000.0, 'ETH-USDT': 3000.0}
         
         for t in range(100):
             current_time = base_time + t * 1000

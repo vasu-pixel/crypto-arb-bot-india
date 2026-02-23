@@ -100,7 +100,7 @@ if prices:
             spread_pct = ((ask - bid) / bid * 100) if bid > 0 else 0
             price_rows.append({
                 "Pair": pair,
-                "Exchange": ep.get("exchange", "").replace("_", " "),
+                "Exchange": ep.get("exchange", ""),
                 "Bid": f"${bid:,.2f}" if bid >= 1 else f"${bid:.6f}",
                 "Ask": f"${ask:,.2f}" if ask >= 1 else f"${ask:.6f}",
                 "Spread": f"{spread_pct:.4f}%",

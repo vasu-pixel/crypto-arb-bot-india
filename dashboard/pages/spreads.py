@@ -34,7 +34,7 @@ if prices:
             continue
         cols = st.columns(len(exchange_prices))
         for i, ep in enumerate(exchange_prices):
-            exch_name = ep.get("exchange", "").replace("_", " ")
+            exch_name = ep.get("exchange", "")
             bid = ep.get("bid", 0)
             ask = ep.get("ask", 0)
             age_ms = ep.get("age_ms", 0)
@@ -97,8 +97,8 @@ if spreads:
         fig = go.Figure(
             data=go.Heatmap(
                 z=matrix_data,
-                x=[e.replace("_", " ") for e in EXCHANGES],
-                y=[e.replace("_", " ") for e in EXCHANGES],
+                x=EXCHANGES,
+                y=EXCHANGES,
                 colorscale=[
                     [0, "rgb(255, 50, 50)"],
                     [0.5, "rgb(255, 255, 255)"],
@@ -127,7 +127,7 @@ if spreads:
             if isinstance(info, dict):
                 table_rows.append(
                     {
-                        "Route": key.replace("_", " "),
+                        "Route": key,
                         "Gross (bps)": f"{info.get('gross_bps', 0):.2f}",
                         "Net (bps)": f"{info.get('net_bps', 0):.2f}",
                         "Profitable": "Yes" if info.get("net_bps", 0) > 0 else "No",
@@ -153,7 +153,7 @@ if spreads:
         best_spreads.append(
             {
                 "Pair": pair,
-                "Best Route": best_route.replace("_", " "),
+                "Best Route": best_route,
                 "Net Spread (bps)": f"{best_net:.2f}",
                 "Actionable": "Yes" if best_net > 0 else "No",
             }

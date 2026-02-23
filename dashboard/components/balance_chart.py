@@ -1,13 +1,13 @@
 import plotly.graph_objects as go
 
 
-def create_balance_chart(balances, asset="USD"):
+def create_balance_chart(balances, asset="USDT"):
     """Create a bar chart showing an asset's balance across exchanges."""
     exchange_names = []
     amounts = []
 
     for exchange, assets in sorted(balances.items()):
-        exchange_names.append(exchange.replace("_", "."))
+        exchange_names.append(exchange)
         amounts.append(assets.get(asset, 0))
 
     fig = go.Figure(

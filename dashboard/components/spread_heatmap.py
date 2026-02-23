@@ -21,8 +21,8 @@ def create_spread_heatmap(pair_spreads, pair_name=""):
     fig = go.Figure(
         data=go.Heatmap(
             z=matrix_data,
-            x=[e.replace("_", ".") for e in EXCHANGES],
-            y=[e.replace("_", ".") for e in EXCHANGES],
+            x=EXCHANGES,
+            y=EXCHANGES,
             colorscale=[
                 [0, "rgb(255, 50, 50)"],
                 [0.5, "rgb(255, 255, 255)"],

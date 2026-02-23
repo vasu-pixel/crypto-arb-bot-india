@@ -21,17 +21,18 @@ with tab1:
     with col1:
         from_date = st.date_input("From Date")
         min_spread = st.number_input("Min Net Spread (bps)", value=3.0, step=0.5)
-        min_trade = st.number_input("Min Trade Size (USD)", value=50.0, step=10.0)
+        min_trade = st.number_input("Min Trade Size (USDT)", value=50.0, step=10.0)
     with col2:
         to_date = st.date_input("To Date")
-        max_trade = st.number_input("Max Trade Size (USD)", value=5000.0, step=100.0)
+        max_trade = st.number_input("Max Trade Size (USDT)", value=5000.0, step=100.0)
 
     data_dir = st.text_input("Historical Data Directory", value="data/historical")
 
     if st.button("Run Backtest", type="primary"):
         with st.spinner("Running backtest..."):
+            bot_binary = os.environ.get("ARB_BOT_BINARY", "./build/src/arb_bot")
             cmd = [
-                "./arb_bot",
+                bot_binary,
                 "--backtest",
                 "--from", str(from_date),
                 "--to", str(to_date),

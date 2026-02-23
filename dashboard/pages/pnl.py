@@ -129,6 +129,6 @@ if fees_per_exchange:
     fee_cols = st.columns(len(fees_per_exchange))
     for i, (exch, fee) in enumerate(sorted(fees_per_exchange.items())):
         with fee_cols[i]:
-            st.metric(exch.replace("_", "."), f"${fee:.2f}")
+            st.metric(exch, f"${fee:.2f}")
 else:
     st.info("No fee data available yet.")
