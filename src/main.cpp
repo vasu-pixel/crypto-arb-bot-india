@@ -147,8 +147,7 @@ int main(int argc, char **argv) {
   std::vector<std::string> pairs = {"BTC-USDT", "ETH-USDT", "SOL-USDT"};
 
   // Initialize fee manager
-  std::vector<IExchange *> exch_ptrs = {binance.get(), okx.get(),
-                                        bybit.get()};
+  std::vector<IExchange *> exch_ptrs = {binance.get(), okx.get(), bybit.get()};
   FeeManager fee_manager(exch_ptrs);
   try {
     fee_manager.refresh_all_fees();
@@ -165,12 +164,13 @@ int main(int argc, char **argv) {
     for (auto &pair : pairs) {
       auto &book = aggregator.get_or_create_book(exch, pair);
       adapter->subscribe_order_book(
-          pair, [&book](const OrderBookSnapshot &snap) {
+          pair, [&book, &aggregator, pair](const OrderBookSnapshot &snap) {
             if (snap.is_delta) {
               book.apply_delta(snap.bids, snap.asks, snap.sequence_id);
             } else {
               book.apply_snapshot(snap.bids, snap.asks, snap.sequence_id);
             }
+            aggregator.notify_book_update(pair);
           });
     }
   }
@@ -216,10 +216,7 @@ int main(int argc, char **argv) {
   }
 
   // Spread detector
-  SpreadDetector detector(aggregator, fee_manager, config.min_net_spread_bps,
-                          config.min_trade_size_usd, config.max_trade_size_usd);
-
-  detector.set_opportunity_callback([&](const ArbitrageOpportunity &opp) {
+  auto opp_callback = [&](const ArbitrageOpportunity &opp) {
     LOG_INFO("Opportunity: {} buy@{}({}) sell@{}({}) net={}bps", opp.pair,
              opp.buy_price, exchange_to_string(opp.buy_exchange),
              opp.sell_price, exchange_to_string(opp.sell_exchange),
@@ -235,8 +232,14 @@ int main(int argc, char **argv) {
     }
 
     ws_server.broadcast_trade(record);
-  });
-  detector.start();
+  };
+
+  SpreadDetector<decltype(opp_callback)> detector(
+      aggregator, fee_manager, config.min_net_spread_bps,
+      config.min_trade_size_usd, config.max_trade_size_usd, opp_callback);
+
+  aggregator.set_update_callback(
+      [&detector](const std::string &pair) { detector.scan_pair(pair); });
 
   // Signal handling
   signal(SIGINT, signal_handler);
@@ -244,13 +247,14 @@ int main(int argc, char **argv) {
 
   LOG_INFO("Bot is running. Press Ctrl+C to stop.");
 
-  // Main loop: fast-path (100ms) for prices/spreads, slow-path (2s) for PnL/balances
-  // Cached trade stats to avoid re-reading file every tick
+  // Main loop: fast-path (100ms) for prices/spreads, slow-path (2s) for
+  // PnL/balances Cached trade stats to avoid re-reading file every tick
   int cached_total_trades = 0;
   int cached_winning_trades = 0;
   double cached_total_fees = 0.0;
   std::map<std::string, double> cached_fees_per_exchange;
-  auto last_slow_tick = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+  auto last_slow_tick =
+      std::chrono::steady_clock::now() - std::chrono::seconds(10);
 
   while (!g_shutdown) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -258,10 +262,12 @@ int main(int argc, char **argv) {
     try {
       auto now = std::chrono::steady_clock::now();
       bool slow_tick = (std::chrono::duration_cast<std::chrono::seconds>(
-                            now - last_slow_tick).count() >= 2);
+                            now - last_slow_tick)
+                            .count() >= 2);
 
       // ── Fast path (every 100ms): prices + spreads ──
-      std::map<std::string, std::vector<MessageTypes::ExchangePrice>> all_prices;
+      std::map<std::string, std::vector<MessageTypes::ExchangePrice>>
+          all_prices;
 
       for (auto &pair : pairs) {
         auto snapshots = aggregator.get_pair_snapshots(pair, 5);
@@ -269,7 +275,7 @@ int main(int argc, char **argv) {
         // Collect live prices from all snapshots
         for (const auto &snap : snapshots) {
           MessageTypes::ExchangePrice ep;
-          ep.exchange = exchange_to_string(snap.exchange);
+          ep.exchange = std::string(exchange_to_string(snap.exchange));
           ep.bid = snap.bids.empty() ? 0.0 : snap.bids.front().price;
           ep.ask = snap.asks.empty() ? 0.0 : snap.asks.front().price;
           auto age = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -278,27 +284,33 @@ int main(int argc, char **argv) {
           all_prices[pair].push_back(ep);
         }
 
-        if (snapshots.size() < 2) continue;
+        if (snapshots.size() < 2)
+          continue;
 
-        std::map<std::string, std::map<std::string, std::pair<double, double>>> spread_matrix;
+        std::map<std::string, std::map<std::string, std::pair<double, double>>>
+            spread_matrix;
         for (size_t i = 0; i < snapshots.size(); ++i) {
           for (size_t j = 0; j < snapshots.size(); ++j) {
-            if (i == j) continue;
+            if (i == j)
+              continue;
             const auto &buy_book = snapshots[i];
             const auto &sell_book = snapshots[j];
-            if (buy_book.asks.empty() || sell_book.bids.empty()) continue;
+            if (buy_book.asks.empty() || sell_book.bids.empty())
+              continue;
 
             double top_ask = buy_book.asks.front().price;
             double top_bid = sell_book.bids.front().price;
-            if (top_ask <= 0.0) continue;
+            if (top_ask <= 0.0)
+              continue;
 
             double gross_bps = (top_bid - top_ask) / top_ask * 10000.0;
             double fee_rate = fee_manager.total_fee_rate(
                 buy_book.exchange, sell_book.exchange, pair);
             double net_bps = gross_bps - fee_rate * 10000.0;
 
-            spread_matrix[exchange_to_string(buy_book.exchange)]
-                         [exchange_to_string(sell_book.exchange)] = {gross_bps, net_bps};
+            spread_matrix[std::string(exchange_to_string(buy_book.exchange))]
+                         [std::string(exchange_to_string(sell_book.exchange))] =
+                             {gross_bps, net_bps};
           }
         }
         if (!spread_matrix.empty()) {
@@ -319,7 +331,8 @@ int main(int argc, char **argv) {
         // Broadcast balances
         if (config.mode == TradingMode::PAPER && paper_executor) {
           auto vb = paper_executor->get_virtual_balances();
-          std::map<Exchange, std::unordered_map<std::string, double>> balances_map;
+          std::map<Exchange, std::unordered_map<std::string, double>>
+              balances_map;
           for (auto &[exch, assets] : vb)
             balances_map[exch] = assets;
           ws_server.broadcast_balances(balances_map);
@@ -341,17 +354,23 @@ int main(int argc, char **argv) {
         cached_total_fees = 0.0;
         cached_fees_per_exchange.clear();
         for (auto &t : all_trades) {
-          if (t.realized_pnl > 0) cached_winning_trades++;
+          if (t.realized_pnl > 0)
+            cached_winning_trades++;
           cached_total_fees += t.buy_result.fee_paid + t.sell_result.fee_paid;
-          cached_fees_per_exchange[exchange_to_string(t.buy_exchange)] += t.buy_result.fee_paid;
-          cached_fees_per_exchange[exchange_to_string(t.sell_exchange)] += t.sell_result.fee_paid;
+          cached_fees_per_exchange[std::string(
+              exchange_to_string(t.buy_exchange))] += t.buy_result.fee_paid;
+          cached_fees_per_exchange[std::string(
+              exchange_to_string(t.sell_exchange))] += t.sell_result.fee_paid;
         }
 
-        double win_rate = (cached_total_trades > 0)
-            ? (100.0 * cached_winning_trades / cached_total_trades) : 0.0;
+        double win_rate =
+            (cached_total_trades > 0)
+                ? (100.0 * cached_winning_trades / cached_total_trades)
+                : 0.0;
 
         ws_server.broadcast_pnl(total_pnl, pnl_per_pair, cached_total_trades,
-                                 win_rate, cached_total_fees, cached_fees_per_exchange);
+                                win_rate, cached_total_fees,
+                                cached_fees_per_exchange);
 
         // Check drift alerts
         if (config.mode == TradingMode::LIVE) {
@@ -372,7 +391,6 @@ int main(int argc, char **argv) {
 
   // Graceful shutdown
   LOG_INFO("Shutting down...");
-  detector.stop();
   inventory_tracker.stop();
   fee_manager.stop();
   ws_server.stop();

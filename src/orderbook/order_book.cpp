@@ -5,161 +5,216 @@
 #include <cmath>
 #include <stdexcept>
 
-OrderBook::OrderBook(Exchange exchange, const std::string& pair)
-    : exchange_(exchange)
-    , pair_(pair)
-    , last_update_time_(std::chrono::steady_clock::now())
-{
+OrderBook::OrderBook(Exchange exchange, const std::string &pair)
+    : exchange_(exchange), pair_(pair),
+      last_update_time_(std::chrono::steady_clock::now()) {}
+
+void OrderBook::sync_top_levels() {
+  num_top_bids_ = std::min(TOP_LEVELS, static_cast<int>(bids_.size()));
+  for (int i = 0; i < num_top_bids_; ++i) {
+    top_bids_[i] = bids_[i];
+  }
+  num_top_asks_ = std::min(TOP_LEVELS, static_cast<int>(asks_.size()));
+  for (int i = 0; i < num_top_asks_; ++i) {
+    top_asks_[i] = asks_[i];
+  }
 }
 
-void OrderBook::apply_snapshot(const std::vector<PriceLevel>& bids,
-                               const std::vector<PriceLevel>& asks,
-                               uint64_t sequence_id)
-{
-    std::unique_lock lock(mutex_);
+void OrderBook::apply_snapshot(const std::vector<PriceLevel> &bids,
+                               const std::vector<PriceLevel> &asks,
+                               uint64_t sequence_id) {
+  std::unique_lock lock(mutex_);
 
-    bids_.clear();
-    asks_.clear();
+  bids_.clear();
+  asks_.clear();
 
-    for (const auto& level : bids) {
-        if (level.quantity > 0.0) {
-            bids_[level.price] = level.quantity;
-        }
-    }
-    for (const auto& level : asks) {
-        if (level.quantity > 0.0) {
-            asks_[level.price] = level.quantity;
-        }
-    }
+  for (const auto &level : bids) {
+    if (level.quantity > 0.0)
+      bids_.push_back(level);
+  }
+  for (const auto &level : asks) {
+    if (level.quantity > 0.0)
+      asks_.push_back(level);
+  }
 
-    last_sequence_id_ = sequence_id;
-    last_update_time_ = std::chrono::steady_clock::now();
+  std::sort(bids_.begin(), bids_.end(),
+            [](auto &a, auto &b) { return a.price > b.price; });
+  std::sort(asks_.begin(), asks_.end(),
+            [](auto &a, auto &b) { return a.price < b.price; });
 
-    LOG_DEBUG("[{}:{}] Snapshot applied: {} bids, {} asks, seq={}",
-              exchange_to_string(exchange_), pair_,
-              bids_.size(), asks_.size(), sequence_id);
+  last_sequence_id_ = sequence_id;
+
+  seqlock_.fetch_add(1, std::memory_order_release);
+  last_update_time_ = std::chrono::steady_clock::now();
+  sync_top_levels();
+  seqlock_.fetch_add(1, std::memory_order_release);
+
+  LOG_DEBUG("[{}:{}] Snapshot applied: {} bids, {} asks, seq={}",
+            exchange_to_string(exchange_), pair_, bids_.size(), asks_.size(),
+            sequence_id);
 }
 
-void OrderBook::apply_delta(const std::vector<PriceLevel>& bid_updates,
-                            const std::vector<PriceLevel>& ask_updates,
-                            uint64_t sequence_id)
-{
-    std::unique_lock lock(mutex_);
+void OrderBook::apply_delta(const std::vector<PriceLevel> &bid_updates,
+                            const std::vector<PriceLevel> &ask_updates,
+                            uint64_t sequence_id) {
+  std::unique_lock lock(mutex_);
 
-    // Guard against out-of-order updates
-    if (sequence_id != 0 && sequence_id <= last_sequence_id_) {
-        LOG_WARN("[{}:{}] Stale delta ignored: seq={} <= last={}",
-                 exchange_to_string(exchange_), pair_,
-                 sequence_id, last_sequence_id_);
-        return;
+  if (sequence_id != 0 && sequence_id <= last_sequence_id_) {
+    LOG_WARN("[{}:{}] Stale delta ignored: seq={} <= last={}",
+             exchange_to_string(exchange_), pair_, sequence_id,
+             last_sequence_id_);
+    return;
+  }
+
+  auto update_vec = [](std::vector<PriceLevel> &vec, const PriceLevel &level,
+                       bool descending) {
+    auto cmp = descending
+                   ? [](const PriceLevel &a, double p) { return a.price > p; }
+                   : [](const PriceLevel &a, double p) { return a.price < p; };
+
+    auto it = std::lower_bound(vec.begin(), vec.end(), level.price, cmp);
+
+    if (it != vec.end() && std::abs(it->price - level.price) < 1e-9) {
+      if (level.quantity <= 0.0) {
+        vec.erase(it);
+      } else {
+        it->quantity = level.quantity;
+      }
+    } else {
+      if (level.quantity > 0.0) {
+        vec.insert(it, level);
+      }
     }
+  };
 
-    for (const auto& level : bid_updates) {
-        if (level.quantity <= 0.0) {
-            bids_.erase(level.price);
-        } else {
-            bids_[level.price] = level.quantity;
-        }
-    }
+  for (const auto &level : bid_updates) {
+    update_vec(bids_, level, true);
+  }
 
-    for (const auto& level : ask_updates) {
-        if (level.quantity <= 0.0) {
-            asks_.erase(level.price);
-        } else {
-            asks_[level.price] = level.quantity;
-        }
-    }
+  for (const auto &level : ask_updates) {
+    update_vec(asks_, level, false);
+  }
 
-    last_sequence_id_ = sequence_id;
-    last_update_time_ = std::chrono::steady_clock::now();
+  last_sequence_id_ = sequence_id;
+
+  seqlock_.fetch_add(1, std::memory_order_release);
+  last_update_time_ = std::chrono::steady_clock::now();
+  sync_top_levels();
+  seqlock_.fetch_add(1, std::memory_order_release);
 }
 
-std::optional<double> OrderBook::best_bid() const
-{
-    std::shared_lock lock(mutex_);
-    if (bids_.empty()) return std::nullopt;
-    return bids_.begin()->first;
-}
+std::optional<double> OrderBook::best_bid() const {
+  uint64_t seq;
+  std::optional<double> result = std::nullopt;
+  do {
+    seq = seqlock_.load(std::memory_order_acquire);
+    if (seq & 1)
+      continue;
 
-std::optional<double> OrderBook::best_ask() const
-{
-    std::shared_lock lock(mutex_);
-    if (asks_.empty()) return std::nullopt;
-    return asks_.begin()->first;
-}
-
-double OrderBook::mid_price() const
-{
-    std::shared_lock lock(mutex_);
-    if (bids_.empty() || asks_.empty()) {
-        throw std::runtime_error("Cannot compute mid price: empty order book for " +
-                                 exchange_to_string(exchange_) + ":" + pair_);
+    if (num_top_bids_ > 0) {
+      result = top_bids_[0].price;
+    } else {
+      result = std::nullopt;
     }
-    return (bids_.begin()->first + asks_.begin()->first) / 2.0;
+
+  } while (seqlock_.load(std::memory_order_acquire) != seq);
+
+  return result;
 }
 
-OrderBookSnapshot OrderBook::snapshot(int depth) const
-{
-    std::shared_lock lock(mutex_);
+std::optional<double> OrderBook::best_ask() const {
+  uint64_t seq;
+  std::optional<double> result = std::nullopt;
+  do {
+    seq = seqlock_.load(std::memory_order_acquire);
+    if (seq & 1)
+      continue;
 
-    OrderBookSnapshot snap;
-    snap.exchange = exchange_;
-    snap.pair = pair_;
+    if (num_top_asks_ > 0) {
+      result = top_asks_[0].price;
+    } else {
+      result = std::nullopt;
+    }
+
+  } while (seqlock_.load(std::memory_order_acquire) != seq);
+
+  return result;
+}
+
+double OrderBook::mid_price() const {
+  uint64_t seq;
+  double bb = 0.0, ba = 0.0;
+  bool valid = false;
+  do {
+    seq = seqlock_.load(std::memory_order_acquire);
+    if (seq & 1)
+      continue;
+
+    if (num_top_bids_ > 0 && num_top_asks_ > 0) {
+      bb = top_bids_[0].price;
+      ba = top_asks_[0].price;
+      valid = true;
+    } else {
+      valid = false;
+    }
+
+  } while (seqlock_.load(std::memory_order_acquire) != seq);
+
+  if (!valid) {
+    throw std::runtime_error("Cannot compute mid price: empty order book for " +
+                             std::string(exchange_to_string(exchange_)) + ":" +
+                             pair_);
+  }
+  return (bb + ba) / 2.0;
+}
+
+OrderBookSnapshot OrderBook::snapshot(int depth) const {
+  OrderBookSnapshot snap;
+  snap.exchange = exchange_;
+  snap.pair = pair_;
+
+  int d = std::min(depth, TOP_LEVELS);
+  snap.bids.resize(d);
+  snap.asks.resize(d);
+
+  uint64_t seq;
+  do {
+    seq = seqlock_.load(std::memory_order_acquire);
+    if (seq & 1)
+      continue;
+
     snap.sequence_id = last_sequence_id_;
     snap.local_timestamp = last_update_time_;
 
-    snap.bids.reserve(static_cast<size_t>(depth));
-    snap.asks.reserve(static_cast<size_t>(depth));
+    int nb = std::min(d, num_top_bids_);
+    for (int i = 0; i < nb; ++i)
+      snap.bids[i] = top_bids_[i];
+    snap.bids.resize(nb);
 
-    int count = 0;
-    for (const auto& [price, qty] : bids_) {
-        if (count >= depth) break;
-        snap.bids.push_back({price, qty});
-        ++count;
-    }
+    int na = std::min(d, num_top_asks_);
+    for (int i = 0; i < na; ++i)
+      snap.asks[i] = top_asks_[i];
+    snap.asks.resize(na);
 
-    count = 0;
-    for (const auto& [price, qty] : asks_) {
-        if (count >= depth) break;
-        snap.asks.push_back({price, qty});
-        ++count;
-    }
+  } while (seqlock_.load(std::memory_order_acquire) != seq);
 
-    return snap;
+  return snap;
 }
 
-bool OrderBook::is_stale(std::chrono::milliseconds threshold) const
-{
-    std::shared_lock lock(mutex_);
-    auto elapsed = std::chrono::steady_clock::now() - last_update_time_;
-    return elapsed > threshold;
+bool OrderBook::is_stale(std::chrono::milliseconds threshold) const {
+  uint64_t seq;
+  std::chrono::steady_clock::time_point lu;
+  do {
+    seq = seqlock_.load(std::memory_order_acquire);
+    if (seq & 1)
+      continue;
+    lu = last_update_time_;
+  } while (seqlock_.load(std::memory_order_acquire) != seq);
+
+  auto elapsed = std::chrono::steady_clock::now() - lu;
+  return elapsed > threshold;
 }
 
-Exchange OrderBook::exchange() const
-{
-    // exchange_ is immutable after construction, no lock needed
-    return exchange_;
-}
+Exchange OrderBook::exchange() const { return exchange_; }
 
-const std::string& OrderBook::pair() const
-{
-    // pair_ is immutable after construction, no lock needed
-    return pair_;
-}
-
-void OrderBook::prune_zero_levels()
-{
-    // Internal helper -- caller must already hold a unique lock
-    for (auto it = bids_.begin(); it != bids_.end(); ) {
-        if (it->second <= 0.0)
-            it = bids_.erase(it);
-        else
-            ++it;
-    }
-    for (auto it = asks_.begin(); it != asks_.end(); ) {
-        if (it->second <= 0.0)
-            it = asks_.erase(it);
-        else
-            ++it;
-    }
-}
+const std::string &OrderBook::pair() const { return pair_; }

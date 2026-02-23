@@ -49,7 +49,6 @@ target_link_libraries(orderbook PUBLIC common)
 
 # -- Strategy library --
 add_library(strategy STATIC
-    strategy/spread_detector.cpp
     strategy/fee_manager.cpp
 )
 target_link_libraries(strategy PUBLIC orderbook exchange)
