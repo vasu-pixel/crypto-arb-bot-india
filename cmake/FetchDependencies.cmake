@@ -46,6 +46,7 @@ if(NOT websocketpp_POPULATED)
     add_library(websocketpp INTERFACE)
     target_include_directories(websocketpp INTERFACE ${websocketpp_SOURCE_DIR})
     target_compile_definitions(websocketpp INTERFACE ASIO_STANDALONE _WEBSOCKETPP_CPP11_STL_)
+    target_compile_options(websocketpp INTERFACE $<$<CXX_COMPILER_ID:GNU>:-fpermissive>)
     target_link_libraries(websocketpp INTERFACE asio)
 endif()
 
