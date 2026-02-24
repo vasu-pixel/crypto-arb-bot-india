@@ -39,6 +39,7 @@ private:
                               double taker_fee_rate, double additional_adverse_bps,
                               double net_spread_bps);
     bool check_virtual_balance(Exchange exch, const std::string& asset, double amount) const;
+    double get_virtual_balance_amount(Exchange exch, const std::string& asset) const;
     void update_virtual_balance(Exchange exch, const std::string& asset, double delta);
     std::string extract_base_asset(const std::string& pair) const;
     std::string extract_quote_asset(const std::string& pair) const;

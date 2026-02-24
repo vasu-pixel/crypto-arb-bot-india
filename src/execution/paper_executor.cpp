@@ -55,6 +55,18 @@ bool PaperExecutor::check_virtual_balance(Exchange exch,
   return asset_it->second >= amount;
 }
 
+double PaperExecutor::get_virtual_balance_amount(Exchange exch,
+                                                  const std::string &asset) const {
+  std::shared_lock lock(mutex_);
+  auto exch_it = virtual_balances_.find(exch);
+  if (exch_it == virtual_balances_.end())
+    return 0.0;
+  auto asset_it = exch_it->second.find(asset);
+  if (asset_it == exch_it->second.end())
+    return 0.0;
+  return asset_it->second;
+}
+
 void PaperExecutor::update_virtual_balance(Exchange exch,
                                            const std::string &asset,
                                            double delta) {
@@ -334,24 +346,56 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
     }
   }
 
-  // ── Existing: Balance check ──────────────────────────────────────
-  double required_quote = opp.buy_price * opp.quantity;
-  if (!check_virtual_balance(opp.buy_exchange, quote, required_quote)) {
-    LOG_WARN("[PAPER] Insufficient {} on {}", quote,
+  // ── Balance-aware quantity clamping ─────────────────────────────
+  // Instead of rejecting when balance is insufficient, clamp the trade
+  // quantity down to what we can actually afford on both sides.
+  double trade_qty = opp.quantity;
+
+  // Clamp by buy-side USDT balance
+  double available_quote = get_virtual_balance_amount(opp.buy_exchange, quote);
+  if (available_quote <= 0.0) {
+    LOG_WARN("[PAPER] No {} on {}", quote,
              exchange_to_string(opp.buy_exchange));
     record.buy_result.status = OrderStatus::REJECTED;
     record.buy_result.error_message = "Insufficient virtual balance";
     record.sell_result.status = OrderStatus::REJECTED;
     return record;
   }
-  if (!check_virtual_balance(opp.sell_exchange, base, opp.quantity)) {
-    LOG_WARN("[PAPER] Insufficient {} on {}", base,
+  double max_qty_by_quote = available_quote / opp.buy_price;
+  if (max_qty_by_quote < trade_qty) {
+    trade_qty = max_qty_by_quote;
+  }
+
+  // Clamp by sell-side base asset balance
+  double available_base = get_virtual_balance_amount(opp.sell_exchange, base);
+  if (available_base <= 0.0) {
+    LOG_WARN("[PAPER] No {} on {}", base,
              exchange_to_string(opp.sell_exchange));
     record.sell_result.status = OrderStatus::REJECTED;
     record.sell_result.error_message = "Insufficient virtual balance";
     record.buy_result.status = OrderStatus::REJECTED;
     return record;
   }
+  if (available_base < trade_qty) {
+    trade_qty = available_base;
+  }
+
+  // Check if clamped quantity still meets minimum thresholds
+  double clamped_notional = trade_qty * opp.buy_price;
+  double min_notional = realism_.enable_min_order_size
+                            ? realism_.default_min_notional_usd
+                            : 5.0;
+  if (clamped_notional < min_notional) {
+    LOG_WARN("[PAPER] Clamped trade too small: ${:.2f} < ${:.2f} min for {}",
+             clamped_notional, min_notional, opp.pair);
+    record.buy_result.status = OrderStatus::REJECTED;
+    record.buy_result.error_message = "Clamped trade below minimum notional";
+    record.sell_result.status = OrderStatus::REJECTED;
+    return record;
+  }
+
+  // Update record and use clamped quantity for the rest of execution
+  record.quantity = trade_qty;
 
   // ── Gap 4: Settle arrived transfers ──────────────────────────────
   settle_pending_transfers();
@@ -425,9 +469,9 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
 
   // ── Simulate fills (Gaps 2, 7 applied inside) ────────────────────
   OrderRequest buy_req{opp.buy_exchange, opp.pair,    Side::BUY, opp.buy_price,
-                       opp.quantity,     CryptoUtils::generate_uuid()};
+                       trade_qty,        CryptoUtils::generate_uuid()};
   OrderRequest sell_req{opp.sell_exchange, opp.pair,     Side::SELL,
-                        opp.sell_price,    opp.quantity,
+                        opp.sell_price,    trade_qty,
                         CryptoUtils::generate_uuid()};
 
   record.buy_result =
