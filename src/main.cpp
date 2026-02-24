@@ -346,9 +346,12 @@ int main(int argc, char **argv) {
 
         ws_server.broadcast_heartbeat();
 
-        // Periodic rebalance: redistribute virtual balances across exchanges
-        // This simulates internal transfers that a real trader would do
+        // Periodic rebalance + settle: redistribute virtual balances across
+        // exchanges and settle any pending transfers whose delay has elapsed
         if (config.mode == TradingMode::PAPER && paper_executor) {
+          // Always try to settle arrived transfers (cheap no-op if none pending)
+          paper_executor->settle_pending_transfers();
+
           auto since_rebalance =
               std::chrono::duration_cast<std::chrono::seconds>(
                   now - last_rebalance)

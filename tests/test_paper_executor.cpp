@@ -68,15 +68,15 @@ static PaperRealismConfig no_realism() {
 
 // Helper: Returns a standard ArbitrageOpportunity for BTC-USDT
 static ArbitrageOpportunity make_btc_opp(double qty = 0.01,
-                                          double net_spread = 3.0) {
+                                          double net_spread = 15.0) {
   ArbitrageOpportunity opp;
   opp.pair = "BTC-USDT";
   opp.buy_exchange = Exchange::BINANCE;
   opp.sell_exchange = Exchange::OKX;
   opp.buy_price = 100000.0;
-  opp.sell_price = 100050.0;
+  opp.sell_price = 100150.0;
   opp.quantity = qty;
-  opp.gross_spread_bps = 5.0;
+  opp.gross_spread_bps = 15.0;
   opp.net_spread_bps = net_spread;
   opp.detected_at = std::chrono::steady_clock::now();
   return opp;

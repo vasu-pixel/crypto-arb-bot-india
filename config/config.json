@@ -33,7 +33,7 @@
     }
   },
   "strategy": {
-    "min_net_spread_bps": 2.0,
+    "min_net_spread_bps": 10.0,
     "min_trade_size_usd": 10.0,
     "max_trade_size_usd": 100.0,
     "max_open_positions": 3,
@@ -87,7 +87,7 @@
 
     "enable_withdrawal_fees": true,
     "withdrawal_fee_pct": 0.1,
-    "withdrawal_flat_fees": { "BTC": 0.0005, "ETH": 0.005, "USDT": 1.0, "SOL": 0.01 },
+    "withdrawal_flat_fees": { "BTC": 0.00005, "ETH": 0.001, "USDT": 1.0, "SOL": 0.005 },
 
     "enable_market_impact": true,
     "impact_decay_seconds": 5.0,

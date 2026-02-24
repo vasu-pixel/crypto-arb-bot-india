@@ -317,6 +317,36 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
   std::string base = extract_base_asset(opp.pair);
   std::string quote = extract_quote_asset(opp.pair);
 
+  // ── Pre-execution profitability guard ──────────────────────────
+  // Estimate expected realism costs and reject if spread can't cover them.
+  // This prevents the bot from executing trades that look profitable
+  // before realism but become losers after slippage + staleness.
+  {
+    double expected_realism_cost_bps = 0.0;
+    if (realism_.enable_adverse_slippage) {
+      // Mean slippage on both legs
+      expected_realism_cost_bps += realism_.slippage_bps_mean * 2.0;
+    }
+    if (realism_.enable_staleness_penalty) {
+      // Assume ~0.5s average book age per leg
+      expected_realism_cost_bps += realism_.staleness_penalty_bps_per_sec * 0.5 * 2.0;
+    }
+    if (realism_.enable_one_leg_risk) {
+      // Expected cost = probability × unwind slippage
+      expected_realism_cost_bps +=
+          realism_.one_leg_probability * realism_.one_leg_unwind_slippage_bps;
+    }
+    if (opp.net_spread_bps < expected_realism_cost_bps) {
+      LOG_DEBUG("[PAPER] Spread {:.1f}bps < realism cost {:.1f}bps for {}",
+               opp.net_spread_bps, expected_realism_cost_bps, opp.pair);
+      record.buy_result.status = OrderStatus::REJECTED;
+      record.buy_result.error_message = "Spread insufficient after realism costs";
+      record.sell_result.status = OrderStatus::REJECTED;
+      record.rejection_reason = "realism_cost";
+      return record;
+    }
+  }
+
   // ── Gap 9: Minimum order size ────────────────────────────────────
   if (realism_.enable_min_order_size) {
     double min_qty = realism_.default_min_notional_usd / opp.buy_price;
@@ -346,12 +376,19 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
     }
   }
 
+  // ── Early fee lookup (needed for balance clamping) ──────────────
+  double buy_taker_fee =
+      fee_manager_.get_fee(opp.buy_exchange, opp.pair).taker_fee;
+  double sell_taker_fee =
+      fee_manager_.get_fee(opp.sell_exchange, opp.pair).taker_fee;
+
   // ── Balance-aware quantity clamping ─────────────────────────────
   // Instead of rejecting when balance is insufficient, clamp the trade
   // quantity down to what we can actually afford on both sides.
+  // Factor in taker fee so we don't overspend and go negative.
   double trade_qty = opp.quantity;
 
-  // Clamp by buy-side USDT balance
+  // Clamp by buy-side USDT balance (including fee overhead)
   double available_quote = get_virtual_balance_amount(opp.buy_exchange, quote);
   if (available_quote <= 0.0) {
     LOG_WARN("[PAPER] No {} on {}", quote,
@@ -361,7 +398,8 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
     record.sell_result.status = OrderStatus::REJECTED;
     return record;
   }
-  double max_qty_by_quote = available_quote / opp.buy_price;
+  double cost_per_unit = opp.buy_price * (1.0 + buy_taker_fee);
+  double max_qty_by_quote = available_quote / cost_per_unit;
   if (max_qty_by_quote < trade_qty) {
     trade_qty = max_qty_by_quote;
   }
@@ -461,12 +499,6 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
   sell_snap = apply_phantom_to_snapshot(sell_snap, opp.sell_exchange, opp.pair,
                                         Side::SELL);
 
-  // ── Get per-exchange per-pair taker fees ─────────────────────────
-  double buy_taker_fee =
-      fee_manager_.get_fee(opp.buy_exchange, opp.pair).taker_fee;
-  double sell_taker_fee =
-      fee_manager_.get_fee(opp.sell_exchange, opp.pair).taker_fee;
-
   // ── Simulate fills (Gaps 2, 7 applied inside) ────────────────────
   OrderRequest buy_req{opp.buy_exchange, opp.pair,    Side::BUY, opp.buy_price,
                        trade_qty,        CryptoUtils::generate_uuid()};
@@ -509,7 +541,12 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
   if (record.buy_result.status == OrderStatus::REJECTED ||
       record.sell_result.status == OrderStatus::REJECTED) {
     record.realized_pnl = 0.0;
-    record.rejection_reason = "competition";
+    // Set rejection reason from the actual error message
+    if (record.buy_result.status == OrderStatus::REJECTED) {
+      record.rejection_reason = record.buy_result.error_message;
+    } else {
+      record.rejection_reason = record.sell_result.error_message;
+    }
     trade_logger_.log_trade(record);
     return record;
   }
@@ -523,18 +560,24 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
       double unwind_cost;
       if (buy_fails) {
         // Sell went through, buy failed → must unwind the sell
-        unwind_cost = record.sell_result.filled_quantity *
-                      record.sell_result.avg_fill_price *
-                      realism_.one_leg_unwind_slippage_bps / 10000.0;
+        double notional = record.sell_result.filled_quantity *
+                          record.sell_result.avg_fill_price;
+        double slippage = notional * realism_.one_leg_unwind_slippage_bps / 10000.0;
+        double original_fee = record.sell_result.fee_paid;
+        double unwind_fee = notional * sell_taker_fee; // fee to unwind
+        unwind_cost = slippage + original_fee + unwind_fee;
         record.buy_result.status = OrderStatus::REJECTED;
         record.buy_result.filled_quantity = 0.0;
         record.buy_result.error_message = "One-leg failure (buy side)";
         update_virtual_balance(opp.sell_exchange, quote, -unwind_cost);
       } else {
         // Buy went through, sell failed → must unwind the buy
-        unwind_cost = record.buy_result.filled_quantity *
-                      record.buy_result.avg_fill_price *
-                      realism_.one_leg_unwind_slippage_bps / 10000.0;
+        double notional = record.buy_result.filled_quantity *
+                          record.buy_result.avg_fill_price;
+        double slippage = notional * realism_.one_leg_unwind_slippage_bps / 10000.0;
+        double original_fee = record.buy_result.fee_paid;
+        double unwind_fee = notional * buy_taker_fee; // fee to unwind
+        unwind_cost = slippage + original_fee + unwind_fee;
         record.sell_result.status = OrderStatus::REJECTED;
         record.sell_result.filled_quantity = 0.0;
         record.sell_result.error_message = "One-leg failure (sell side)";
@@ -558,15 +601,23 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
   double buy_cost = record.buy_result.avg_fill_price * matched_qty;
   double sell_proceeds = record.sell_result.avg_fill_price * matched_qty;
 
-  update_virtual_balance(opp.buy_exchange, base, matched_qty);
-  update_virtual_balance(opp.buy_exchange, quote,
-                         -buy_cost - record.buy_result.fee_paid);
-  update_virtual_balance(opp.sell_exchange, base, -matched_qty);
-  update_virtual_balance(opp.sell_exchange, quote,
-                         sell_proceeds - record.sell_result.fee_paid);
+  // Scale fees proportionally to matched_qty (if partial fill, don't charge
+  // fees on the unmatched excess which would be cancelled in reality)
+  double buy_fee = record.buy_result.fee_paid;
+  double sell_fee = record.sell_result.fee_paid;
+  if (record.buy_result.filled_quantity > matched_qty && record.buy_result.filled_quantity > 0.0) {
+    buy_fee *= matched_qty / record.buy_result.filled_quantity;
+  }
+  if (record.sell_result.filled_quantity > matched_qty && record.sell_result.filled_quantity > 0.0) {
+    sell_fee *= matched_qty / record.sell_result.filled_quantity;
+  }
 
-  record.realized_pnl = sell_proceeds - buy_cost - record.buy_result.fee_paid -
-                        record.sell_result.fee_paid;
+  update_virtual_balance(opp.buy_exchange, base, matched_qty);
+  update_virtual_balance(opp.buy_exchange, quote, -buy_cost - buy_fee);
+  update_virtual_balance(opp.sell_exchange, base, -matched_qty);
+  update_virtual_balance(opp.sell_exchange, quote, sell_proceeds - sell_fee);
+
+  record.realized_pnl = sell_proceeds - buy_cost - buy_fee - sell_fee;
   {
     std::unique_lock lock(mutex_);
     total_pnl_ += record.realized_pnl;
