@@ -206,14 +206,20 @@ int main(int argc, char **argv) {
   std::unique_ptr<ExecutionEngine> live_executor;
 
   if (config.mode == TradingMode::PAPER) {
-    // Collect active exchange IDs for balance distribution
+    // Collect active exchange IDs for balance distribution,
+    // skipping exchanges excluded from paper trading (e.g. Binance, MEXC)
     std::vector<Exchange> active_exchanges;
     for (auto& [exch_id, ptr] : exchanges) {
-      active_exchanges.push_back(exch_id);
+      if (config.paper_excluded_exchanges.count(exch_id) == 0) {
+        active_exchanges.push_back(exch_id);
+      } else {
+        LOG_INFO("Excluding {} from paper balance distribution",
+                 exchange_to_string(exch_id));
+      }
     }
     paper_executor = std::make_unique<PaperExecutor>(
         config.paper_initial_balances, active_exchanges, aggregator,
-        fee_manager, trade_logger);
+        fee_manager, trade_logger, config.paper_realism);
     LOG_INFO("Paper trading mode active with {} exchanges",
              active_exchanges.size());
   } else {

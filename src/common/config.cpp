@@ -137,5 +137,71 @@ Config Config::load(const std::string& filepath) {
         }
     }
 
+    // Paper trading excluded exchanges
+    if (j.contains("paper_trading") && j["paper_trading"].contains("excluded_exchanges")) {
+        for (auto& name : j["paper_trading"]["excluded_exchanges"]) {
+            std::string s = name.get<std::string>();
+            // Uppercase for exchange_from_string
+            for (auto& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            try {
+                config.paper_excluded_exchanges.insert(exchange_from_string(s));
+            } catch (...) {
+                // Ignore unknown exchange names
+            }
+        }
+    }
+
+    // Paper realism configuration (omitting section = all defaults = realism enabled)
+    if (j.contains("paper_realism")) {
+        auto& pr = j["paper_realism"];
+        auto& r = config.paper_realism;
+
+        r.enable_latency = pr.value("enable_latency", r.enable_latency);
+        r.latency_mean_ms = pr.value("latency_mean_ms", r.latency_mean_ms);
+        r.latency_stddev_ms = pr.value("latency_stddev_ms", r.latency_stddev_ms);
+
+        r.enable_adverse_slippage = pr.value("enable_adverse_slippage", r.enable_adverse_slippage);
+        r.slippage_bps_mean = pr.value("slippage_bps_mean", r.slippage_bps_mean);
+        r.slippage_bps_stddev = pr.value("slippage_bps_stddev", r.slippage_bps_stddev);
+
+        r.enable_staleness_penalty = pr.value("enable_staleness_penalty", r.enable_staleness_penalty);
+        r.staleness_penalty_bps_per_sec = pr.value("staleness_penalty_bps_per_sec", r.staleness_penalty_bps_per_sec);
+        r.max_book_age_ms = pr.value("max_book_age_ms", r.max_book_age_ms);
+
+        r.enable_realistic_rebalance = pr.value("enable_realistic_rebalance", r.enable_realistic_rebalance);
+        r.rebalance_delay_minutes = pr.value("rebalance_delay_minutes", r.rebalance_delay_minutes);
+
+        r.enable_withdrawal_fees = pr.value("enable_withdrawal_fees", r.enable_withdrawal_fees);
+        r.withdrawal_fee_pct = pr.value("withdrawal_fee_pct", r.withdrawal_fee_pct);
+        if (pr.contains("withdrawal_flat_fees")) {
+            for (auto& [asset, fee] : pr["withdrawal_flat_fees"].items()) {
+                r.withdrawal_flat_fees[asset] = fee.get<double>();
+            }
+        }
+
+        r.enable_market_impact = pr.value("enable_market_impact", r.enable_market_impact);
+        r.impact_decay_seconds = pr.value("impact_decay_seconds", r.impact_decay_seconds);
+
+        r.enable_competition = pr.value("enable_competition", r.enable_competition);
+        r.competition_base_prob = pr.value("competition_base_prob", r.competition_base_prob);
+        r.competition_decay_bps = pr.value("competition_decay_bps", r.competition_decay_bps);
+
+        r.enable_rate_limits = pr.value("enable_rate_limits", r.enable_rate_limits);
+        r.max_orders_per_second = pr.value("max_orders_per_second", r.max_orders_per_second);
+        r.max_orders_per_minute = pr.value("max_orders_per_minute", r.max_orders_per_minute);
+
+        r.enable_min_order_size = pr.value("enable_min_order_size", r.enable_min_order_size);
+        if (pr.contains("min_order_sizes")) {
+            for (auto& [pair, sz] : pr["min_order_sizes"].items()) {
+                r.min_order_sizes[pair] = sz.get<double>();
+            }
+        }
+        r.default_min_notional_usd = pr.value("default_min_notional_usd", r.default_min_notional_usd);
+
+        r.enable_one_leg_risk = pr.value("enable_one_leg_risk", r.enable_one_leg_risk);
+        r.one_leg_probability = pr.value("one_leg_probability", r.one_leg_probability);
+        r.one_leg_unwind_slippage_bps = pr.value("one_leg_unwind_slippage_bps", r.one_leg_unwind_slippage_bps);
+    }
+
     return config;
 }
