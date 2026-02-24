@@ -10,6 +10,8 @@
 class BinanceAdapter;
 class OkxAdapter;
 class BybitAdapter;
+class MexcAdapter;
+class GateioAdapter;
 
 class ExchangeFactory {
 public:

@@ -18,6 +18,18 @@
       "secret_key": "ENV:BYBIT_SECRET_KEY",
       "rest_base_url": "https://api.bybit.com",
       "ws_base_url": "wss://stream.bybit.com/v5/public/spot"
+    },
+    "mexc": {
+      "api_key": "ENV:MEXC_API_KEY",
+      "secret_key": "ENV:MEXC_SECRET_KEY",
+      "rest_base_url": "https://api.mexc.com",
+      "ws_base_url": "wss://wbs.mexc.com/ws"
+    },
+    "gateio": {
+      "api_key": "ENV:GATEIO_API_KEY",
+      "secret_key": "ENV:GATEIO_SECRET_KEY",
+      "rest_base_url": "https://api.gateio.ws",
+      "ws_base_url": "wss://api.gateio.ws/ws/v4/"
     }
   },
   "strategy": {

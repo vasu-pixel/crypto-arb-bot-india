@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-enum class Exchange { BINANCE, OKX, BYBIT, COUNT };
+enum class Exchange { BINANCE, OKX, BYBIT, MEXC, GATEIO, COUNT };
+inline constexpr size_t EXCHANGE_COUNT = static_cast<size_t>(Exchange::COUNT);
 
 // Hash specialization so Exchange can be used as key in unordered_map
 namespace std {
@@ -36,6 +37,10 @@ inline std::string_view exchange_to_string(Exchange e) {
     return "OKX";
   case Exchange::BYBIT:
     return "BYBIT";
+  case Exchange::MEXC:
+    return "MEXC";
+  case Exchange::GATEIO:
+    return "GATEIO";
   case Exchange::COUNT:
     return "COUNT";
   }
@@ -49,6 +54,10 @@ inline Exchange exchange_from_string(const std::string &s) {
     return Exchange::OKX;
   if (s == "BYBIT")
     return Exchange::BYBIT;
+  if (s == "MEXC")
+    return Exchange::MEXC;
+  if (s == "GATEIO")
+    return Exchange::GATEIO;
   throw std::runtime_error("Unknown exchange: " + s);
 }
 

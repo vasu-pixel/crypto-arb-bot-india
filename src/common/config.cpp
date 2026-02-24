@@ -65,6 +65,24 @@ Config Config::load(const std::string& filepath) {
             c.value("ws_base_url", "wss://stream.bybit.com/v5/public/spot")
         };
     }
+    if (exch.contains("mexc")) {
+        auto& m = exch["mexc"];
+        config.exchanges[Exchange::MEXC] = {
+            resolve_env(m.value("api_key", "")),
+            resolve_env(m.value("secret_key", "")),
+            m.value("rest_base_url", "https://api.mexc.com"),
+            m.value("ws_base_url", "wss://wbs.mexc.com/ws")
+        };
+    }
+    if (exch.contains("gateio")) {
+        auto& g = exch["gateio"];
+        config.exchanges[Exchange::GATEIO] = {
+            resolve_env(g.value("api_key", "")),
+            resolve_env(g.value("secret_key", "")),
+            g.value("rest_base_url", "https://api.gateio.ws"),
+            g.value("ws_base_url", "wss://api.gateio.ws/ws/v4/")
+        };
+    }
 
     // Strategy
     if (j.contains("strategy")) {

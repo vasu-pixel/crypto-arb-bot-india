@@ -13,7 +13,7 @@ FeeManager::~FeeManager() { stop(); }
 void FeeManager::refresh_all_fees() {
   LOG_INFO("Refreshing fee schedule from all exchanges...");
 
-  std::unordered_map<std::string, std::array<std::optional<FeeInfo>, 3>>
+  std::unordered_map<std::string, std::array<std::optional<FeeInfo>, EXCHANGE_COUNT>>
       new_cache;
 
   for (auto *exchange : exchanges_) {
@@ -71,6 +71,14 @@ static FeeInfo default_fee_for_exchange(Exchange exch,
   case Exchange::BYBIT:
     info.maker_fee = 0.001; // 0.10%
     info.taker_fee = 0.001; // 0.10%
+    break;
+  case Exchange::MEXC:
+    info.maker_fee = 0.0;    // 0.00% (MEXC zero maker)
+    info.taker_fee = 0.0005; // 0.05%
+    break;
+  case Exchange::GATEIO:
+    info.maker_fee = 0.0002;  // 0.02%
+    info.taker_fee = 0.00075; // 0.075%
     break;
   default:
     info.maker_fee = 0.001; // 0.10% conservative default

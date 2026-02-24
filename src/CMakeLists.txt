@@ -29,6 +29,14 @@ add_library(exchange STATIC
     exchange/bybit/bybit_rest.cpp
     exchange/bybit/bybit_ws.cpp
     exchange/bybit/bybit_adapter.cpp
+    exchange/mexc/mexc_auth.cpp
+    exchange/mexc/mexc_rest.cpp
+    exchange/mexc/mexc_ws.cpp
+    exchange/mexc/mexc_adapter.cpp
+    exchange/gateio/gateio_auth.cpp
+    exchange/gateio/gateio_rest.cpp
+    exchange/gateio/gateio_ws.cpp
+    exchange/gateio/gateio_adapter.cpp
 )
 target_link_libraries(exchange PUBLIC
     common

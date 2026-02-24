@@ -43,7 +43,7 @@ public:
 
 private:
   // Key: "PAIR"
-  std::unordered_map<std::string, std::array<std::unique_ptr<OrderBook>, 3>>
+  std::unordered_map<std::string, std::array<std::unique_ptr<OrderBook>, EXCHANGE_COUNT>>
       books_;
   mutable std::shared_mutex mutex_;
   UpdateCallback update_callback_;

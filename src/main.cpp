@@ -48,7 +48,7 @@ discover_top_pairs(std::unordered_map<Exchange, IExchange *> &exchanges,
     }
   }
 
-  // Only keep pairs available on all 3 exchanges
+  // Only keep pairs available on all exchanges
   std::vector<std::pair<std::string, double>> candidates;
   for (auto &[pair, volume] : volume_sum) {
     if (pair_exchange_count[pair] >= static_cast<int>(exchanges.size())) {
@@ -124,30 +124,32 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  // Create exchange adapters
-  auto binance = ExchangeFactory::create(Exchange::BINANCE, config);
-  auto okx = ExchangeFactory::create(Exchange::OKX, config);
-  auto bybit = ExchangeFactory::create(Exchange::BYBIT, config);
+  // Create exchange adapters for all configured exchanges
+  std::vector<std::unique_ptr<IExchange>> exchange_owners;
+  std::unordered_map<Exchange, IExchange *> exchanges;
 
-  std::unordered_map<Exchange, IExchange *> exchanges = {
-      {Exchange::BINANCE, binance.get()},
-      {Exchange::OKX, okx.get()},
-      {Exchange::BYBIT, bybit.get()},
-  };
+  for (auto& [exch_id, exch_cfg] : config.exchanges) {
+    try {
+      auto adapter = ExchangeFactory::create(exch_id, config);
+      exchanges[exch_id] = adapter.get();
+      exchange_owners.push_back(std::move(adapter));
+    } catch (const std::exception& e) {
+      LOG_ERROR("Failed to create adapter for {}: {}",
+                exchange_to_string(exch_id), e.what());
+    }
+  }
 
-  // Discover top pairs
-  // auto pairs = discover_top_pairs(exchanges, 10);
-  // if (pairs.empty()) {
-  //     LOG_ERROR("No common pairs found across exchanges");
-  //     return 1;
-  // }
+  LOG_INFO("Created {} exchange adapters", exchanges.size());
 
-  // Hardcoded USDT pairs for India trading
+  // Hardcoded USDT pairs for India/Global trading
   // Must use canonical "BASE-QUOTE" format used throughout the codebase
   std::vector<std::string> pairs = {"BTC-USDT", "ETH-USDT", "SOL-USDT"};
 
   // Initialize fee manager
-  std::vector<IExchange *> exch_ptrs = {binance.get(), okx.get(), bybit.get()};
+  std::vector<IExchange *> exch_ptrs;
+  for (auto& [exch_id, ptr] : exchanges) {
+    exch_ptrs.push_back(ptr);
+  }
   FeeManager fee_manager(exch_ptrs);
   try {
     fee_manager.refresh_all_fees();

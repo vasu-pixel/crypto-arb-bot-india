@@ -35,7 +35,7 @@ public:
 
 private:
   // Key: "PAIR", mapped to enum-indexed array
-  std::unordered_map<std::string, std::array<std::optional<FeeInfo>, 3>>
+  std::unordered_map<std::string, std::array<std::optional<FeeInfo>, EXCHANGE_COUNT>>
       fee_cache_;
   mutable std::shared_mutex mutex_;
   std::vector<IExchange *> exchanges_;
