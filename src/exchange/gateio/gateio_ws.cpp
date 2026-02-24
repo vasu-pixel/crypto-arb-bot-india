@@ -105,7 +105,8 @@ void GateioWs::on_message(const std::string& msg) {
                 if (bid.is_array() && bid.size() >= 2) {
                     double price = std::stod(bid[0].get<std::string>());
                     double qty = std::stod(bid[1].get<std::string>());
-                    if (qty > 0) snap.bids.push_back({price, qty});
+                    // For deltas, qty=0 means "remove level" — must pass through
+                    if (snap.is_delta || qty > 0) snap.bids.push_back({price, qty});
                 }
             }
         }
@@ -114,7 +115,8 @@ void GateioWs::on_message(const std::string& msg) {
                 if (ask.is_array() && ask.size() >= 2) {
                     double price = std::stod(ask[0].get<std::string>());
                     double qty = std::stod(ask[1].get<std::string>());
-                    if (qty > 0) snap.asks.push_back({price, qty});
+                    // For deltas, qty=0 means "remove level" — must pass through
+                    if (snap.is_delta || qty > 0) snap.asks.push_back({price, qty});
                 }
             }
         }

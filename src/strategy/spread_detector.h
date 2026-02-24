@@ -9,7 +9,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 template <typename OpportunityCallback> class SpreadDetector {
 public:
@@ -26,6 +28,11 @@ public:
     auto snapshots = aggregator_.get_pair_snapshots(pair, 20);
     if (snapshots.size() < 2)
       return;
+
+    // Find the single best opportunity across all exchange pairs
+    double best_net_bps = min_net_spread_bps_;
+    ArbitrageOpportunity best_opp;
+    bool found = false;
 
     for (size_t i = 0; i < snapshots.size(); ++i) {
       for (size_t j = 0; j < snapshots.size(); ++j) {
@@ -96,30 +103,57 @@ public:
         if (net_spread_bps < min_net_spread_bps_)
           continue;
 
-        ArbitrageOpportunity opp;
-        opp.pair = pair;
-        opp.buy_exchange = buy_book.exchange;
-        opp.sell_exchange = sell_book.exchange;
-        opp.buy_price = buy_eff.avg_price;
-        opp.sell_price = sell_eff.avg_price;
-        opp.quantity = actual_qty;
-        opp.gross_spread_bps = gross_spread_bps;
-        opp.net_spread_bps = net_spread_bps;
-        opp.detected_at = std::chrono::steady_clock::now();
+        // Track only the best opportunity (highest net spread)
+        if (net_spread_bps > best_net_bps) {
+          best_net_bps = net_spread_bps;
 
-        // Optimized Log formatting here to cover task 8
-        if (Logger::get()->level() <= spdlog::level::info) {
-          LOG_INFO("ARB DETECTED: {} buy@{} ({}) sell@{} ({}) qty={:.6f} "
-                   "gross={:.1f}bps net={:.1f}bps",
-                   pair, buy_eff.avg_price,
-                   exchange_to_string(buy_book.exchange), sell_eff.avg_price,
-                   exchange_to_string(sell_book.exchange), actual_qty,
-                   gross_spread_bps, net_spread_bps);
+          best_opp.pair = pair;
+          best_opp.buy_exchange = buy_book.exchange;
+          best_opp.sell_exchange = sell_book.exchange;
+          best_opp.buy_price = buy_eff.avg_price;
+          best_opp.sell_price = sell_eff.avg_price;
+          best_opp.quantity = actual_qty;
+          best_opp.gross_spread_bps = gross_spread_bps;
+          best_opp.net_spread_bps = net_spread_bps;
+          best_opp.detected_at = std::chrono::steady_clock::now();
+          found = true;
         }
-
-        callback_(opp);
       }
     }
+
+    if (!found)
+      return;
+
+    // Cooldown: don't fire the same pair+direction more than once per second
+    auto cooldown_key = best_opp.pair + ":" +
+                        std::to_string(static_cast<int>(best_opp.buy_exchange)) +
+                        ":" +
+                        std::to_string(static_cast<int>(best_opp.sell_exchange));
+    {
+      std::lock_guard<std::mutex> lock(cooldown_mutex_);
+      auto now = std::chrono::steady_clock::now();
+      auto it = last_trade_time_.find(cooldown_key);
+      if (it != last_trade_time_.end()) {
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              now - it->second)
+                              .count();
+        if (elapsed_ms < kCooldownMs) {
+          return; // Still in cooldown
+        }
+      }
+      last_trade_time_[cooldown_key] = now;
+    }
+
+    if (Logger::get()->level() <= spdlog::level::info) {
+      LOG_INFO("ARB DETECTED: {} buy@{} ({}) sell@{} ({}) qty={:.6f} "
+               "gross={:.1f}bps net={:.1f}bps",
+               best_opp.pair, best_opp.buy_price,
+               exchange_to_string(best_opp.buy_exchange), best_opp.sell_price,
+               exchange_to_string(best_opp.sell_exchange), best_opp.quantity,
+               best_opp.gross_spread_bps, best_opp.net_spread_bps);
+    }
+
+    callback_(best_opp);
   }
 
 private:
@@ -130,4 +164,10 @@ private:
   double max_trade_size_usd_;
 
   OpportunityCallback callback_;
+
+  // Trade cooldown: prevent rapid-fire on the same pair+direction
+  static constexpr int64_t kCooldownMs = 1000; // 1 second between trades
+  std::mutex cooldown_mutex_;
+  std::unordered_map<std::string, std::chrono::steady_clock::time_point>
+      last_trade_time_;
 };
