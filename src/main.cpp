@@ -145,9 +145,13 @@ int main(int argc, char **argv) {
   // Must use canonical "BASE-QUOTE" format used throughout the codebase
   std::vector<std::string> pairs = {"BTC-USDT", "ETH-USDT", "SOL-USDT"};
 
-  // Initialize fee manager
+  // Initialize fee manager (skip excluded exchanges in paper mode)
   std::vector<IExchange *> exch_ptrs;
   for (auto& [exch_id, ptr] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch_id) > 0) {
+      continue;
+    }
     exch_ptrs.push_back(ptr);
   }
   FeeManager fee_manager(exch_ptrs);
@@ -162,7 +166,12 @@ int main(int argc, char **argv) {
   OrderBookAggregator aggregator;
 
   // Subscribe to order books for all pairs on all exchanges
+  // (skip excluded exchanges in paper mode)
   for (auto &[exch, adapter] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch) > 0) {
+      continue;
+    }
     for (auto &pair : pairs) {
       auto &book = aggregator.get_or_create_book(exch, pair);
       adapter->subscribe_order_book(
@@ -177,8 +186,15 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Connect all exchanges
+  // Connect exchanges (skip excluded ones in paper mode to avoid
+  // geo-blocked reconnect loops that can cause thread deadlocks)
   for (auto &[exch, adapter] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch) > 0) {
+      LOG_INFO("Skipping {} connection (excluded from paper trading)",
+               exchange_to_string(exch));
+      continue;
+    }
     try {
       adapter->connect();
       LOG_INFO("{} connected", exchange_to_string(exch));
@@ -206,14 +222,20 @@ int main(int argc, char **argv) {
   std::unique_ptr<ExecutionEngine> live_executor;
 
   if (config.mode == TradingMode::PAPER) {
-    // Collect active exchange IDs for balance distribution
+    // Collect active exchange IDs for balance distribution,
+    // skipping exchanges excluded from paper trading (e.g. Binance, MEXC)
     std::vector<Exchange> active_exchanges;
     for (auto& [exch_id, ptr] : exchanges) {
-      active_exchanges.push_back(exch_id);
+      if (config.paper_excluded_exchanges.count(exch_id) == 0) {
+        active_exchanges.push_back(exch_id);
+      } else {
+        LOG_INFO("Excluding {} from paper balance distribution",
+                 exchange_to_string(exch_id));
+      }
     }
     paper_executor = std::make_unique<PaperExecutor>(
         config.paper_initial_balances, active_exchanges, aggregator,
-        fee_manager, trade_logger);
+        fee_manager, trade_logger, config.paper_realism);
     LOG_INFO("Paper trading mode active with {} exchanges",
              active_exchanges.size());
   } else {
@@ -340,9 +362,12 @@ int main(int argc, char **argv) {
 
         ws_server.broadcast_heartbeat();
 
-        // Periodic rebalance: redistribute virtual balances across exchanges
-        // This simulates internal transfers that a real trader would do
+        // Periodic rebalance + settle: redistribute virtual balances across
+        // exchanges and settle any pending transfers whose delay has elapsed
         if (config.mode == TradingMode::PAPER && paper_executor) {
+          // Always try to settle arrived transfers (cheap no-op if none pending)
+          paper_executor->settle_pending_transfers();
+
           auto since_rebalance =
               std::chrono::duration_cast<std::chrono::seconds>(
                   now - last_rebalance)

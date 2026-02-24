@@ -37,7 +37,16 @@ void to_json(nlohmann::json& j, const TradeRecord& r) {
         }},
         {"realized_pnl", r.realized_pnl},
         {"timestamp", r.timestamp_iso},
-        {"mode", trading_mode_to_string(r.mode)}
+        {"mode", trading_mode_to_string(r.mode)},
+        {"sim_latency_buy_ms", r.simulated_latency_buy_ms},
+        {"sim_latency_sell_ms", r.simulated_latency_sell_ms},
+        {"adverse_slippage_buy_bps", r.adverse_slippage_buy_bps},
+        {"adverse_slippage_sell_bps", r.adverse_slippage_sell_bps},
+        {"staleness_penalty_buy_bps", r.staleness_penalty_buy_bps},
+        {"staleness_penalty_sell_bps", r.staleness_penalty_sell_bps},
+        {"competition_fill_prob", r.competition_fill_prob},
+        {"one_leg_failure", r.one_leg_failure},
+        {"rejection_reason", r.rejection_reason}
     };
 }
 
@@ -67,6 +76,17 @@ void from_json(const nlohmann::json& j, TradeRecord& r) {
     if (mode_str == "PAPER") r.mode = TradingMode::PAPER;
     else if (mode_str == "BACKTEST") r.mode = TradingMode::BACKTEST;
     else r.mode = TradingMode::LIVE;
+
+    // Paper-realism simulation metadata
+    r.simulated_latency_buy_ms = j.value("sim_latency_buy_ms", 0.0);
+    r.simulated_latency_sell_ms = j.value("sim_latency_sell_ms", 0.0);
+    r.adverse_slippage_buy_bps = j.value("adverse_slippage_buy_bps", 0.0);
+    r.adverse_slippage_sell_bps = j.value("adverse_slippage_sell_bps", 0.0);
+    r.staleness_penalty_buy_bps = j.value("staleness_penalty_buy_bps", 0.0);
+    r.staleness_penalty_sell_bps = j.value("staleness_penalty_sell_bps", 0.0);
+    r.competition_fill_prob = j.value("competition_fill_prob", 0.0);
+    r.one_leg_failure = j.value("one_leg_failure", false);
+    r.rejection_reason = j.value("rejection_reason", "");
 
     if (j.contains("buy_result")) {
         auto& br = j["buy_result"];
