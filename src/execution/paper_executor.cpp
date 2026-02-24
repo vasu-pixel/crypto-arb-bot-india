@@ -198,6 +198,31 @@ TradeRecord PaperExecutor::execute(const ArbitrageOpportunity &opp) {
   return record;
 }
 
+void PaperExecutor::rebalance() {
+  std::unique_lock lock(mutex_);
+  if (virtual_balances_.empty())
+    return;
+
+  // Collect total of each asset across all exchanges
+  std::unordered_map<std::string, double> totals;
+  size_t num_exchanges = virtual_balances_.size();
+  for (auto &[exch, assets] : virtual_balances_) {
+    for (auto &[asset, amount] : assets) {
+      totals[asset] += amount;
+    }
+  }
+
+  // Redistribute equally
+  for (auto &[asset, total] : totals) {
+    double per_exchange = total / static_cast<double>(num_exchanges);
+    for (auto &[exch, assets] : virtual_balances_) {
+      assets[asset] = per_exchange;
+    }
+  }
+
+  LOG_INFO("[PAPER] Rebalanced across {} exchanges", num_exchanges);
+}
+
 std::map<Exchange, std::unordered_map<std::string, double>>
 PaperExecutor::get_virtual_balances() const {
   std::shared_lock lock(mutex_);

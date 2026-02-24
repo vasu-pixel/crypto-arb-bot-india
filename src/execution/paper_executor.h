@@ -18,6 +18,9 @@ public:
 
     TradeRecord execute(const ArbitrageOpportunity& opp);
 
+    // Redistribute all assets equally across exchanges (simulates internal transfers)
+    void rebalance();
+
     std::map<Exchange, std::unordered_map<std::string, double>> get_virtual_balances() const;
     double get_virtual_pnl() const;
 

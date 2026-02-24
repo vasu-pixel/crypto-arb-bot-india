@@ -264,6 +264,9 @@ int main(int argc, char **argv) {
   std::map<std::string, double> cached_fees_per_exchange;
   auto last_slow_tick =
       std::chrono::steady_clock::now() - std::chrono::seconds(10);
+  auto last_rebalance =
+      std::chrono::steady_clock::now();
+  constexpr int kRebalanceIntervalS = 60; // Rebalance virtual balances every 60s
 
   while (!g_shutdown) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -336,6 +339,19 @@ int main(int argc, char **argv) {
         last_slow_tick = now;
 
         ws_server.broadcast_heartbeat();
+
+        // Periodic rebalance: redistribute virtual balances across exchanges
+        // This simulates internal transfers that a real trader would do
+        if (config.mode == TradingMode::PAPER && paper_executor) {
+          auto since_rebalance =
+              std::chrono::duration_cast<std::chrono::seconds>(
+                  now - last_rebalance)
+                  .count();
+          if (since_rebalance >= kRebalanceIntervalS) {
+            paper_executor->rebalance();
+            last_rebalance = now;
+          }
+        }
 
         // Broadcast balances
         if (config.mode == TradingMode::PAPER && paper_executor) {
