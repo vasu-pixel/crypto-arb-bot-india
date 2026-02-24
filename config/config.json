@@ -62,7 +62,10 @@
   },
   "paper_trading": {
     "initial_balances": {
-      "USDT": 1500.0
+      "USDT": 250.0,
+      "BTC": 0.001,
+      "ETH": 0.03,
+      "SOL": 0.5
     },
     "excluded_exchanges": ["binance", "mexc"]
   },
