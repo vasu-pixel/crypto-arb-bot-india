@@ -145,9 +145,13 @@ int main(int argc, char **argv) {
   // Must use canonical "BASE-QUOTE" format used throughout the codebase
   std::vector<std::string> pairs = {"BTC-USDT", "ETH-USDT", "SOL-USDT"};
 
-  // Initialize fee manager
+  // Initialize fee manager (skip excluded exchanges in paper mode)
   std::vector<IExchange *> exch_ptrs;
   for (auto& [exch_id, ptr] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch_id) > 0) {
+      continue;
+    }
     exch_ptrs.push_back(ptr);
   }
   FeeManager fee_manager(exch_ptrs);
@@ -162,7 +166,12 @@ int main(int argc, char **argv) {
   OrderBookAggregator aggregator;
 
   // Subscribe to order books for all pairs on all exchanges
+  // (skip excluded exchanges in paper mode)
   for (auto &[exch, adapter] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch) > 0) {
+      continue;
+    }
     for (auto &pair : pairs) {
       auto &book = aggregator.get_or_create_book(exch, pair);
       adapter->subscribe_order_book(
@@ -177,8 +186,15 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Connect all exchanges
+  // Connect exchanges (skip excluded ones in paper mode to avoid
+  // geo-blocked reconnect loops that can cause thread deadlocks)
   for (auto &[exch, adapter] : exchanges) {
+    if (config.mode == TradingMode::PAPER &&
+        config.paper_excluded_exchanges.count(exch) > 0) {
+      LOG_INFO("Skipping {} connection (excluded from paper trading)",
+               exchange_to_string(exch));
+      continue;
+    }
     try {
       adapter->connect();
       LOG_INFO("{} connected", exchange_to_string(exch));
