@@ -10,7 +10,8 @@
 
 class PaperExecutor {
 public:
-    PaperExecutor(const std::map<std::string, double>& initial_balances_per_exchange,
+    PaperExecutor(const std::map<std::string, double>& initial_balances,
+                  const std::vector<Exchange>& active_exchanges,
                   OrderBookAggregator& aggregator,
                   FeeManager& fee_manager,
                   TradeLogger& trade_logger);

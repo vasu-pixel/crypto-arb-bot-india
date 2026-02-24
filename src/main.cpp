@@ -206,9 +206,16 @@ int main(int argc, char **argv) {
   std::unique_ptr<ExecutionEngine> live_executor;
 
   if (config.mode == TradingMode::PAPER) {
+    // Collect active exchange IDs for balance distribution
+    std::vector<Exchange> active_exchanges;
+    for (auto& [exch_id, ptr] : exchanges) {
+      active_exchanges.push_back(exch_id);
+    }
     paper_executor = std::make_unique<PaperExecutor>(
-        config.paper_initial_balances, aggregator, fee_manager, trade_logger);
-    LOG_INFO("Paper trading mode active");
+        config.paper_initial_balances, active_exchanges, aggregator,
+        fee_manager, trade_logger);
+    LOG_INFO("Paper trading mode active with {} exchanges",
+             active_exchanges.size());
   } else {
     live_executor = std::make_unique<ExecutionEngine>(
         exchanges, order_manager, inventory_tracker, trade_logger);

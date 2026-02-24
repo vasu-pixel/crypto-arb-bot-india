@@ -8,16 +8,24 @@
 
 PaperExecutor::PaperExecutor(
     const std::map<std::string, double> &initial_balances,
+    const std::vector<Exchange> &active_exchanges,
     OrderBookAggregator &aggregator, FeeManager &fee_manager,
     TradeLogger &trade_logger)
     : aggregator_(aggregator), fee_manager_(fee_manager),
       trade_logger_(trade_logger), rng_(std::random_device{}()) {
-  // Distribute initial balances across all exchanges equally
+  // Distribute initial balances across ALL configured exchanges equally
+  if (active_exchanges.empty()) {
+    LOG_WARN("[PAPER] No active exchanges — virtual balances will be empty");
+    return;
+  }
+  double n = static_cast<double>(active_exchanges.size());
   for (auto &[asset, amount] : initial_balances) {
-    double per_exchange = amount / 3.0;
-    virtual_balances_[Exchange::BINANCE][asset] = per_exchange;
-    virtual_balances_[Exchange::OKX][asset] = per_exchange;
-    virtual_balances_[Exchange::BYBIT][asset] = per_exchange;
+    double per_exchange = amount / n;
+    for (auto exch : active_exchanges) {
+      virtual_balances_[exch][asset] = per_exchange;
+    }
+    LOG_INFO("[PAPER] {} = {:.6f} per exchange ({} exchanges)", asset,
+             per_exchange, active_exchanges.size());
   }
 }
 

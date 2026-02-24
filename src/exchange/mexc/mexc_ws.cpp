@@ -59,9 +59,15 @@ void MexcWs::unsubscribe_depth(const std::string& symbol) {
 
 void MexcWs::on_message(const std::string& msg) {
     try {
+        // MEXC sends raw text "ping" for keepalive (not JSON)
+        if (msg == "ping") {
+            ws_client_.send("pong");
+            return;
+        }
+
         auto j = nlohmann::json::parse(msg);
 
-        // Handle ping/pong keepalive
+        // Handle JSON-style ping/pong keepalive (fallback)
         if (j.contains("ping")) {
             nlohmann::json pong;
             pong["pong"] = j["ping"];

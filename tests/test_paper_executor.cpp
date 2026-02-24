@@ -92,7 +92,8 @@ protected:
 TEST_F(PaperExecutorTest, VirtualBalancesInitialized) {
   // Initial balances distributed across 3 exchanges equally
   std::map<std::string, double> initial = {{"USDT", 30000.0}, {"BTC", 0.3}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   auto balances = executor.get_virtual_balances();
   // Each exchange should have 10000 USD and 0.1 BTC
@@ -106,7 +107,8 @@ TEST_F(PaperExecutorTest, VirtualBalancesInitialized) {
 
 TEST_F(PaperExecutorTest, ExecuteArbitrageUpdatesBalances) {
   std::map<std::string, double> initial = {{"USDT", 30000.0}, {"BTC", 0.3}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   ArbitrageOpportunity opp;
   opp.pair = "BTC-USDT";
@@ -135,7 +137,8 @@ TEST_F(PaperExecutorTest, ExecuteArbitrageUpdatesBalances) {
 
 TEST_F(PaperExecutorTest, InsufficientBalanceRejects) {
   std::map<std::string, double> initial = {{"USDT", 3.0}, {"BTC", 0.0}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   ArbitrageOpportunity opp;
   opp.pair = "BTC-USDT";
@@ -153,7 +156,8 @@ TEST_F(PaperExecutorTest, InsufficientBalanceRejects) {
 
 TEST_F(PaperExecutorTest, TradeLoggedAfterExecution) {
   std::map<std::string, double> initial = {{"USDT", 30000.0}, {"BTC", 0.3}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   ArbitrageOpportunity opp;
   opp.pair = "BTC-USDT";
@@ -177,7 +181,8 @@ TEST_F(PaperExecutorTest, TradeLoggedAfterExecution) {
 
 TEST_F(PaperExecutorTest, PnlTracked) {
   std::map<std::string, double> initial = {{"USDT", 30000.0}, {"BTC", 0.3}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   ArbitrageOpportunity opp;
   opp.pair = "BTC-USDT";
@@ -200,7 +205,8 @@ TEST_F(PaperExecutorTest, PnlTracked) {
 TEST_F(PaperExecutorTest, PerExchangeFeesApplied) {
   // Verify that different exchanges get different fee rates
   std::map<std::string, double> initial = {{"USDT", 30000.0}, {"BTC", 0.3}};
-  PaperExecutor executor(initial, aggregator, *fee_manager, *logger);
+  std::vector<Exchange> active = {Exchange::BINANCE, Exchange::OKX, Exchange::BYBIT};
+  PaperExecutor executor(initial, active, aggregator, *fee_manager, *logger);
 
   // Execute buy on Binance (0.1% taker) and sell on OKX (0.26% taker)
   ArbitrageOpportunity opp;
