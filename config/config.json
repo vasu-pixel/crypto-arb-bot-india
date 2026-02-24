@@ -86,8 +86,8 @@
     "rebalance_delay_minutes": 30.0,
 
     "enable_withdrawal_fees": true,
-    "withdrawal_fee_pct": 0.1,
-    "withdrawal_flat_fees": { "BTC": 0.00005, "ETH": 0.001, "USDT": 1.0, "SOL": 0.005 },
+    "withdrawal_fee_pct": 0.0,
+    "withdrawal_flat_fees": { "BTC": 0.0002, "ETH": 0.0005, "USDT": 1.0, "SOL": 0.01 },
 
     "enable_market_impact": true,
     "impact_decay_seconds": 5.0,
