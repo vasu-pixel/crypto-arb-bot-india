@@ -18,16 +18,18 @@ BacktestEngine::run(const std::vector<HistoricalSnapshot> &data) {
   trades_.clear();
 
   // Create simulated exchanges with realistic per-exchange fee rates
-  // Binance: 0.1% maker/taker, OKX: 0.08%/0.10%, Bybit: 0.1%/0.1%
+  // These match the FeeManager defaults for consistency
   struct ExchangeFees {
     Exchange id;
     double maker;
     double taker;
   };
   std::vector<ExchangeFees> exch_fees = {
-      {Exchange::BINANCE, 0.001, 0.001},
-      {Exchange::OKX, 0.0008, 0.001},
-      {Exchange::BYBIT, 0.001, 0.001},
+      {Exchange::BINANCE, 0.001, 0.001},    // 0.10% / 0.10%
+      {Exchange::OKX, 0.0008, 0.001},       // 0.08% / 0.10%
+      {Exchange::BYBIT, 0.001, 0.001},      // 0.10% / 0.10%
+      {Exchange::MEXC, 0.0, 0.0005},        // 0.00% / 0.05%
+      {Exchange::GATEIO, 0.002, 0.002},     // 0.20% / 0.20% (VIP0)
   };
 
   std::map<Exchange, std::unique_ptr<SimulatedExchange>> sim_exchanges;

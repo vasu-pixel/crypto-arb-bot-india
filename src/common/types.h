@@ -162,6 +162,17 @@ struct TradeRecord {
   double realized_pnl = 0.0;
   std::string timestamp_iso;
   TradingMode mode = TradingMode::LIVE;
+
+  // Paper-realism simulation metadata (populated only in PAPER mode)
+  double simulated_latency_buy_ms = 0.0;
+  double simulated_latency_sell_ms = 0.0;
+  double adverse_slippage_buy_bps = 0.0;
+  double adverse_slippage_sell_bps = 0.0;
+  double staleness_penalty_buy_bps = 0.0;
+  double staleness_penalty_sell_bps = 0.0;
+  double competition_fill_prob = 0.0;
+  bool one_leg_failure = false;
+  std::string rejection_reason;
 };
 
 struct BalanceInfo {

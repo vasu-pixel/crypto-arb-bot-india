@@ -80,9 +80,10 @@ FeeInfo GateioRest::fetch_trade_fee(const std::string& currency_pair) {
     FeeInfo info;
     info.exchange = Exchange::GATEIO;
     info.pair = currency_pair;
-    // Gate.io default: 0.2% maker, 0.2% taker (VIP0); commonly 0.02%/0.075% for moderate volume
-    info.maker_fee = 0.0002;
-    info.taker_fee = 0.00075;
+    // Gate.io VIP0 base rate: 0.2% maker, 0.2% taker
+    // API call below will fetch actual tier-adjusted rates if API key is configured
+    info.maker_fee = 0.002;
+    info.taker_fee = 0.002;
 
     if (!auth_.get_api_key().empty()) {
         try {

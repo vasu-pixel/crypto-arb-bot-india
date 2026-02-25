@@ -77,8 +77,8 @@ static FeeInfo default_fee_for_exchange(Exchange exch,
     info.taker_fee = 0.0005; // 0.05%
     break;
   case Exchange::GATEIO:
-    info.maker_fee = 0.0002;  // 0.02%
-    info.taker_fee = 0.00075; // 0.075%
+    info.maker_fee = 0.002;  // 0.20% (VIP0 base rate)
+    info.taker_fee = 0.002;  // 0.20% (VIP0 base rate)
     break;
   default:
     info.maker_fee = 0.001; // 0.10% conservative default
