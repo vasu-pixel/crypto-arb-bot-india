@@ -95,13 +95,19 @@ nlohmann::json make_pnl_message(double total_pnl,
                                  const std::map<std::string, double>& pnl_per_pair,
                                  int total_trades, double win_rate,
                                  double total_fees,
-                                 const std::map<std::string, double>& fees_per_exchange)
+                                 const std::map<std::string, double>& fees_per_exchange,
+                                 double total_return,
+                                 double initial_portfolio_value,
+                                 double current_portfolio_value)
 {
     nlohmann::json data;
     data["total_pnl"]    = total_pnl;
     data["total_trades"]  = total_trades;
     data["win_rate"]      = win_rate;
     data["total_fees"]    = total_fees;
+    data["total_return"]  = total_return;
+    data["initial_portfolio_value"] = initial_portfolio_value;
+    data["current_portfolio_value"] = current_portfolio_value;
 
     nlohmann::json per_pair = nlohmann::json::object();
     for (const auto& [pair, pnl] : pnl_per_pair) {

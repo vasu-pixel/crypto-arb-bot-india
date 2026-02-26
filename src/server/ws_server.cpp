@@ -129,10 +129,15 @@ void DashboardWsServer::broadcast_pnl(double total_pnl,
                                         const std::map<std::string, double>& pnl_per_pair,
                                         int total_trades, double win_rate,
                                         double total_fees,
-                                        const std::map<std::string, double>& fees_per_exchange) {
+                                        const std::map<std::string, double>& fees_per_exchange,
+                                        double total_return,
+                                        double initial_portfolio_value,
+                                        double current_portfolio_value) {
     auto msg = MessageTypes::make_pnl_message(total_pnl, pnl_per_pair,
                                                 total_trades, win_rate, total_fees,
-                                                fees_per_exchange);
+                                                fees_per_exchange, total_return,
+                                                initial_portfolio_value,
+                                                current_portfolio_value);
     broadcast(msg.dump());
 }
 

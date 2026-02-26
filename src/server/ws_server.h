@@ -36,7 +36,10 @@ public:
                             std::unordered_map<std::string, double>>& balances);
     void broadcast_pnl(double total_pnl, const std::map<std::string, double>& pnl_per_pair,
                         int total_trades, double win_rate, double total_fees,
-                        const std::map<std::string, double>& fees_per_exchange);
+                        const std::map<std::string, double>& fees_per_exchange,
+                        double total_return = 0.0,
+                        double initial_portfolio_value = 0.0,
+                        double current_portfolio_value = 0.0);
     void broadcast_heartbeat();
     void broadcast_prices(
         const std::map<std::string, std::vector<MessageTypes::ExchangePrice>>& prices);

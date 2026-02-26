@@ -25,11 +25,43 @@ st.title("Profit & Loss")
 pnl_data = receiver.get_pnl()
 trades = receiver.get_trades(n=500)
 
+# Total Return banner (portfolio value change including unrealized)
+total_return = pnl_data.get("total_return", 0)
+initial_pv = pnl_data.get("initial_portfolio_value", 0)
+current_pv = pnl_data.get("current_portfolio_value", 0)
+return_pct = (total_return / initial_pv * 100) if initial_pv > 0 else 0
+
+if initial_pv > 0:
+    tr_color = "green" if total_return >= 0 else "red"
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, {'#0a2e1a' if total_return >= 0 else '#2e0a0a'}, #1a1a2e);
+                    border: 1px solid {'#1aff1a40' if total_return >= 0 else '#ff1a1a40'};
+                    border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="color: #888; font-size: 14px;">Total Return (Realized + Unrealized)</div>
+                    <div style="color: {tr_color}; font-size: 36px; font-weight: bold;">
+                        ${total_return:+,.2f} ({return_pct:+.1f}%)
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color: #888; font-size: 12px;">Initial Value</div>
+                    <div style="color: #ccc; font-size: 18px;">${initial_pv:,.2f}</div>
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">Current Value</div>
+                    <div style="color: #ccc; font-size: 18px;">${current_pv:,.2f}</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # Top-level metrics
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     total_pnl = pnl_data.get("total_pnl", 0)
-    st.metric("Cumulative P&L", f"${total_pnl:.2f}")
+    st.metric("Realized P&L (Trades Only)", f"${total_pnl:.2f}")
 with col2:
     total_trades = pnl_data.get("total_trades", 0)
     st.metric("Total Trades", total_trades)
@@ -39,6 +71,16 @@ with col3:
 with col4:
     total_fees = pnl_data.get("total_fees", 0)
     st.metric("Total Fees Paid", f"${total_fees:.2f}")
+
+# Divergence warning: when realized PnL and total return differ significantly
+if initial_pv > 0 and abs(total_return - total_pnl) > 1.0:
+    divergence = total_return - total_pnl
+    st.warning(
+        f"Realized P&L (${total_pnl:+.2f}) differs from Total Return "
+        f"(${total_return:+.2f}) by ${divergence:+.2f}. "
+        f"This gap is due to {'asset depreciation' if divergence < 0 else 'asset appreciation'}, "
+        f"transfer fees, and rebalancing costs not captured in trade P&L."
+    )
 
 # Equity curve
 if trades:

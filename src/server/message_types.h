@@ -26,12 +26,15 @@ nlohmann::json make_spreads_message(
     const std::string& pair,
     const std::map<std::string, std::map<std::string, std::pair<double, double>>>& spreads);
 
-/// Envelope for overall and per-pair PnL with trade stats.
+/// Envelope for overall and per-pair PnL with trade stats + total return.
 nlohmann::json make_pnl_message(double total_pnl,
                                  const std::map<std::string, double>& pnl_per_pair,
                                  int total_trades, double win_rate,
                                  double total_fees,
-                                 const std::map<std::string, double>& fees_per_exchange);
+                                 const std::map<std::string, double>& fees_per_exchange,
+                                 double total_return = 0.0,
+                                 double initial_portfolio_value = 0.0,
+                                 double current_portfolio_value = 0.0);
 
 /// Envelope for the latest balances across all exchanges.
 nlohmann::json make_balances_message(

@@ -12,9 +12,10 @@ PaperExecutor::PaperExecutor(
     const std::vector<Exchange> &active_exchanges,
     OrderBookAggregator &aggregator, FeeManager &fee_manager,
     TradeLogger &trade_logger, const PaperRealismConfig &realism)
-    : active_exchanges_(active_exchanges), aggregator_(aggregator),
-      fee_manager_(fee_manager), trade_logger_(trade_logger),
-      rng_(std::random_device{}()), realism_(realism) {
+    : active_exchanges_(active_exchanges), initial_balances_(initial_balances),
+      aggregator_(aggregator), fee_manager_(fee_manager),
+      trade_logger_(trade_logger), rng_(std::random_device{}()),
+      realism_(realism) {
   if (active_exchanges.empty()) {
     LOG_WARN("[PAPER] No active exchanges — virtual balances will be empty");
     return;
@@ -659,11 +660,18 @@ void PaperExecutor::rebalance() {
   if (num_exchanges < 2)
     return;
 
+  // Compute totals including both current balances AND pending transfers
+  // so we don't double-deduct assets that are already in transit.
   std::unordered_map<std::string, double> totals;
   for (auto &[exch, assets] : virtual_balances_) {
     for (auto &[asset, amount] : assets) {
       totals[asset] += amount;
     }
+  }
+  // Include pending in-transit amounts in the total (they are already
+  // deducted from source but not yet credited to destination)
+  for (const auto &pt : pending_transfers_) {
+    totals[pt.asset] += pt.amount;
   }
 
   if (!realism_.enable_realistic_rebalance) {
@@ -674,8 +682,20 @@ void PaperExecutor::rebalance() {
         assets[asset] = per_exchange;
       }
     }
+    // Clear any pending transfers since we just did an instant rebalance
+    pending_transfers_.clear();
     LOG_INFO("[PAPER] Instant rebalance across {} exchanges", num_exchanges);
     return;
+  }
+
+  // Compute effective balances per exchange (current + pending incoming)
+  // to avoid creating duplicate transfers for assets already in transit
+  std::map<Exchange, std::unordered_map<std::string, double>> effective_balances;
+  for (auto &[exch, assets] : virtual_balances_) {
+    effective_balances[exch] = assets;
+  }
+  for (const auto &pt : pending_transfers_) {
+    effective_balances[pt.to_exchange][pt.asset] += pt.amount;
   }
 
   // Realistic rebalance: create delayed transfers with fees
@@ -687,16 +707,20 @@ void PaperExecutor::rebalance() {
     double target = total / static_cast<double>(num_exchanges);
 
     for (auto &[exch, assets] : virtual_balances_) {
-      double current = assets[asset];
-      double excess = current - target;
-      if (excess <= 0.0)
+      // Use effective balance (including pending incoming) to decide excess
+      double effective = effective_balances[exch][asset];
+      double excess = effective - target;
+      // Only transfer from actual on-hand balance, not pending amounts
+      double actual_excess = assets[asset] - target;
+      double transferable = std::min(excess, actual_excess);
+      if (transferable <= 1e-12)
         continue;
 
       // Deduct excess from source immediately
-      assets[asset] = target;
+      assets[asset] -= transferable;
 
       // Compute withdrawal fees (Gap 5)
-      double amount_to_transfer = excess;
+      double amount_to_transfer = transferable;
       if (realism_.enable_withdrawal_fees) {
         double flat_fee = 0.0;
         auto fee_it = realism_.withdrawal_flat_fees.find(asset);
@@ -709,14 +733,20 @@ void PaperExecutor::rebalance() {
         if (amount_to_transfer <= 0.0) {
           LOG_WARN("[PAPER] Withdrawal fees exceed transfer amount for {}",
                    asset);
+          // Refund the deduction since transfer failed
+          assets[asset] += transferable;
           continue;
         }
       }
 
       // Distribute net amount to deficit exchanges via pending transfers
+      // Use effective balances to calculate deficit
       for (auto &[dest_exch, dest_assets] : virtual_balances_) {
-        double deficit = target - dest_assets[asset];
-        if (deficit <= 0.0 || dest_exch == exch)
+        if (dest_exch == exch)
+          continue;
+        double effective_dest = effective_balances[dest_exch][asset];
+        double deficit = target - effective_dest;
+        if (deficit <= 0.0)
           continue;
 
         double transfer_share = std::min(deficit, amount_to_transfer);
@@ -744,4 +774,19 @@ PaperExecutor::get_virtual_balances() const {
 double PaperExecutor::get_virtual_pnl() const {
   std::shared_lock lock(mutex_);
   return total_pnl_;
+}
+
+std::map<std::string, double> PaperExecutor::get_initial_balances() const {
+  std::shared_lock lock(mutex_);
+  return initial_balances_;
+}
+
+std::unordered_map<std::string, double>
+PaperExecutor::get_pending_transfer_totals() const {
+  std::shared_lock lock(mutex_);
+  std::unordered_map<std::string, double> totals;
+  for (const auto &pt : pending_transfers_) {
+    totals[pt.asset] += pt.amount;
+  }
+  return totals;
 }

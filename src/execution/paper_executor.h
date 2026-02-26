@@ -33,6 +33,12 @@ public:
     std::map<Exchange, std::unordered_map<std::string, double>> get_virtual_balances() const;
     double get_virtual_pnl() const;
 
+    /// Initial balances for total-return computation (per-asset totals).
+    std::map<std::string, double> get_initial_balances() const;
+
+    /// Sum of all pending (in-transit) transfers per asset.
+    std::unordered_map<std::string, double> get_pending_transfer_totals() const;
+
 private:
     // --- Fill simulation ---
     OrderResult simulate_fill(const OrderRequest& req, const OrderBookSnapshot& book,
@@ -53,6 +59,7 @@ private:
 
     // --- Core state ---
     std::vector<Exchange> active_exchanges_;
+    std::map<std::string, double> initial_balances_;   // total per asset at startup
     std::map<Exchange, std::unordered_map<std::string, double>> virtual_balances_;
     OrderBookAggregator& aggregator_;
     FeeManager& fee_manager_;

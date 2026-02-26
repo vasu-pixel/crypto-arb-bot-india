@@ -418,9 +418,71 @@ int main(int argc, char **argv) {
                 ? (100.0 * cached_winning_trades / cached_total_trades)
                 : 0.0;
 
+        // Compute total return: current portfolio value vs initial value
+        // Uses live prices to value held assets (unrealized + realized)
+        double total_return = 0.0;
+        double initial_portfolio_value = 0.0;
+        double current_portfolio_value = 0.0;
+        if (config.mode == TradingMode::PAPER && paper_executor) {
+          auto vb = paper_executor->get_virtual_balances();
+          auto initial_bal = paper_executor->get_initial_balances();
+          auto pending = paper_executor->get_pending_transfer_totals();
+
+          // Build mid-price map from live order books
+          std::unordered_map<std::string, double> asset_mid_prices;
+          for (auto &pair : pairs) {
+            auto dash = pair.find('-');
+            if (dash == std::string::npos) continue;
+            std::string base = pair.substr(0, dash);
+            // Get best snapshot from any exchange for mid price
+            auto snapshots = aggregator.get_pair_snapshots(pair, 5);
+            for (const auto &snap : snapshots) {
+              if (!snap.bids.empty() && !snap.asks.empty()) {
+                double mid = (snap.bids.front().price + snap.asks.front().price) / 2.0;
+                if (mid > 0.0) {
+                  asset_mid_prices[base] = mid;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Compute initial portfolio value at current prices
+          for (auto &[asset, amount] : initial_bal) {
+            if (asset == "USDT" || asset == "USD" || asset == "USDC") {
+              initial_portfolio_value += amount;
+            } else if (asset_mid_prices.count(asset)) {
+              initial_portfolio_value += amount * asset_mid_prices[asset];
+            }
+          }
+
+          // Compute current portfolio value (on-hand + in-transit)
+          for (auto &[exch, assets] : vb) {
+            for (auto &[asset, amount] : assets) {
+              if (asset == "USDT" || asset == "USD" || asset == "USDC") {
+                current_portfolio_value += amount;
+              } else if (asset_mid_prices.count(asset)) {
+                current_portfolio_value += amount * asset_mid_prices[asset];
+              }
+            }
+          }
+          // Add pending transfers (already deducted from source, not yet at dest)
+          for (auto &[asset, amount] : pending) {
+            if (asset == "USDT" || asset == "USD" || asset == "USDC") {
+              current_portfolio_value += amount;
+            } else if (asset_mid_prices.count(asset)) {
+              current_portfolio_value += amount * asset_mid_prices[asset];
+            }
+          }
+
+          total_return = current_portfolio_value - initial_portfolio_value;
+        }
+
         ws_server.broadcast_pnl(total_pnl, pnl_per_pair, cached_total_trades,
                                 win_rate, cached_total_fees,
-                                cached_fees_per_exchange);
+                                cached_fees_per_exchange, total_return,
+                                initial_portfolio_value,
+                                current_portfolio_value);
 
         // Check drift alerts
         if (config.mode == TradingMode::LIVE) {
